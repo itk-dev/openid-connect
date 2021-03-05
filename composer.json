@@ -3,5 +3,8 @@
     "description": "OpenID connect configuration package",
     "type": "library",
     "license": "MIT",
-    "require": {}
+    "require": {
+        "php": ">=7.2.5",
+        "league/oauth2-client": "^2.6"
+    }
 }
