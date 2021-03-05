@@ -14,8 +14,8 @@ composer require itk-dev/openid-connect
 
 To use the package create a provider and redirect to the authorization url
 
-```shell
-$provider = new OpenIdConfigurationProvider([
+```
+provider = new OpenIdConfigurationProvider([
             'redirectUri' => $this->generateUrl('default', [], UrlGeneratorInterface::ABSOLUTE_URL),
         ] + $openIdProviderOptions);
 
@@ -27,13 +27,15 @@ return new RedirectResponse($authUrl);
 where `$openIdProviderOptions` advantageously could
 be injected and bound in the ```services.yaml``` file:
 
-```shell
-bind:
-  $openIdProviderOptions:
-    urlConfiguration: '%env(OPEN_ID_PROVIDER_URL)%'
-    cachePath: '%env(resolve:OPEN_ID_PROVIDER_CACHE_PATH)%'
-    clientId: '%env(OPEN_ID_PROVIDER_CLIENT_ID)%'
-    clientSecret: '%env(OPEN_ID_PROVIDER_CLIENT_SECRET)%'
+```yaml
+services:
+  _defaults:
+    bind:
+      $openIdProviderOptions:
+        urlConfiguration: '%env(OPEN_ID_PROVIDER_URL)%'
+        cachePath: '%env(resolve:OPEN_ID_PROVIDER_CACHE_PATH)%'
+        clientId: '%env(OPEN_ID_PROVIDER_CLIENT_ID)%'
+        clientSecret: '%env(OPEN_ID_PROVIDER_CLIENT_SECRET)%'
 ```
 and the environment variables must be set in the ```.env``` or ```.env.local.``` file.
 
@@ -41,7 +43,7 @@ and the environment variables must be set in the ```.env``` or ```.env.local.```
 Note that the default response type and mode
 is set in ```OpenIdConfigurationProvider.php```
 
-```shell
+```
 'response_type' => 'id_token',
 'response_mode' => 'query',
 ```
