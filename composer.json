@@ -1,0 +1,7 @@
+{
+    "name": "itk-dev/openid-connect",
+    "description": "OpenID connect configuration package",
+    "type": "library",
+    "license": "MIT",
+    "require": {}
+}
