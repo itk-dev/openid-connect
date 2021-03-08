@@ -1,3 +1,5 @@
+# Work in progress
+
 # OpenID Connect
 
 Composer package for OpenID Connect via Azure B2C
