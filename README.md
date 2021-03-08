@@ -15,7 +15,7 @@ composer require itk-dev/openid-connect
 To use the package create a provider and redirect to the authorization url
 
 ```
-provider = new OpenIdConfigurationProvider([
+$provider = new OpenIdConfigurationProvider([
             'redirectUri' => $this->generateUrl('default', [], UrlGeneratorInterface::ABSOLUTE_URL),
         ] + $openIdProviderOptions);
 
@@ -37,8 +37,15 @@ services:
         clientId: '%env(OPEN_ID_PROVIDER_CLIENT_ID)%'
         clientSecret: '%env(OPEN_ID_PROVIDER_CLIENT_SECRET)%'
 ```
-and the environment variables must be set in the ```.env``` or ```.env.local.``` file.
+while the environment variables must be set in the ```.env``` or ```.env.local.``` file -
+see example beneath
 
+```
+OPEN_ID_PROVIDER_URL='https://.../.well-known/openid-configuration...'
+OPEN_ID_PROVIDER_CLIENT_ID={app.client.id}
+OPEN_ID_PROVIDER_CLIENT_SECRET={app.client.secret}
+OPEN_ID_PROVIDER_CACHE_PATH='%kernel.cache_dir%/.well_known_cache.php'
+```
 
 Note that the default response type and mode
 is set in ```OpenIdConfigurationProvider.php```
