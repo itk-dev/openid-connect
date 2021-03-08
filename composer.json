@@ -3,8 +3,19 @@
     "description": "OpenID connect configuration package",
     "type": "library",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Jeppe Kuhlmann Andersen",
+            "email": "jekua@aarhus.dk"
+        }
+    ],
     "require": {
         "php": ">=7.2.5",
         "league/oauth2-client": "^2.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "ItkDev\\OpenIdConnect\\": "src/"
+        }
     }
 }

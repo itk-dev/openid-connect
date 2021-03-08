@@ -57,7 +57,7 @@ is set in ```OpenIdConfigurationProvider.php```
 'response_mode' => 'query',
 ```
 
-The Request should then be handled in some sort of GuardAuthenticator
+The request should then be handled in some sort of GuardAuthenticator
 
 ## Tests
 
