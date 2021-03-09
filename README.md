@@ -20,20 +20,20 @@ To use the package import the namespace
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 ```
 
-Then create a provider and redirect to the authorization url
+Then create a provider and direct to the authorization url
 
 ```
 $provider = new OpenIdConfigurationProvider([
-            'redirectUrl' => 'https://some.url', // Absolute url to where the user is redirected after a successful login            
-            'urlConfiguration' => 'https://.../openid-configuration', // url to OpenId configuration
-            'cachePath' => '/some/directory/openId-cache.php', // Path for caching above configuration document
-            'clientId'=> 'client_id', // Client id assigned by Azure
-            'clientSecret'=> 'client_secret', // Client password assigned by Azure
-        ]);
+    'redirectUri' => 'https://some.url', // Absolute url to where the user is redirected after a successful login            
+    'urlConfiguration' => 'https:/.../openid-configuration', // url to OpenId configuration
+    'cachePath' => '/some/directory/openId-cache.php', // Path for caching above configuration document
+    'clientId'=> 'client_id', // Client id assigned by Azure
+    'clientSecret'=> 'client_secret', // Client password assigned by Azure
+ ]);
 
 $authUrl = $provider->getAuthorizationUrl();
 
-// direct client to $authUrl
+// direct to $authUrl
 ```
 
 Note that the default response type and mode
@@ -43,6 +43,14 @@ is set in ```OpenIdConfigurationProvider.php```
 'response_type' => 'id_token',
 'response_mode' => 'query',
 ```
+
+
+## Flow
+
+When a user wishes to authenticate themselves, we create an instance of
+`OpenIdConfigurationProvider` and direct them to the authorization url.
+Here the user can authenticate using their Azure B2C login, and if successful be redirected
+back the uri provided when creating the provider instance.
 
 ## Coding standards
 
