@@ -52,13 +52,19 @@ When a user wishes to authenticate themselves, we create an instance of
 Here the user can authenticate using their Azure B2C login, and if successful be redirected
 back the uri provided when creating the provider instance.
 
-## Coding standards
+## Coding standard test
 
-The coding standard we use...
+The following command let you test that the code follows the coding standard we decided to adhere to in this project.
+* PHP files (PHP-CS-Fixer)
+
+    ```
+    ./vendor/bin/php-cs-fixer fix src --dry-run
+    ```
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning.
+We use [SemVer](http://semver.org/) for versioning. 
+See LINK HERE for versions available.
 
 ## License 
 This project is licensed under the MIT License - see the
