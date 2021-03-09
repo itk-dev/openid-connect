@@ -24,35 +24,16 @@ Then create a provider and redirect to the authorization url
 
 ```
 $provider = new OpenIdConfigurationProvider([
-            'redirectUri' => $this->generateUrl('default', [], UrlGeneratorInterface::ABSOLUTE_URL),
-        ] + $openIdProviderOptions);
+            'redirectUrl' => 'https://some.url', // Absolute url to where the user is redirected after a successful login            
+            'urlConfiguration' => 'https://.../openid-configuration', // url to OpenId configuration
+            'cachePath' => '/some/directory/openId-cache.php', // Path for caching above configuration document
+            'clientId'=> 'client_id', // Client id assigned by Azure
+            'clientSecret'=> 'client_secret', // Client password assigned by Azure
+        ]);
 
 $authUrl = $provider->getAuthorizationUrl();
 
-return new RedirectResponse($authUrl);
-```
-
-where `$openIdProviderOptions` advantageously could
-be injected and bound in the ```services.yaml``` file:
-
-```yaml
-services:
-  _defaults:
-    bind:
-      $openIdProviderOptions:
-        urlConfiguration: '%env(OPEN_ID_PROVIDER_URL)%'
-        cachePath: '%env(resolve:OPEN_ID_PROVIDER_CACHE_PATH)%'
-        clientId: '%env(OPEN_ID_PROVIDER_CLIENT_ID)%'
-        clientSecret: '%env(OPEN_ID_PROVIDER_CLIENT_SECRET)%'
-```
-while the environment variables must be set in the ```.env``` or ```.env.local.``` file -
-see example beneath
-
-```
-OPEN_ID_PROVIDER_URL='https://.../.well-known/openid-configuration...'
-OPEN_ID_PROVIDER_CLIENT_ID={app.client.id}
-OPEN_ID_PROVIDER_CLIENT_SECRET={app.client.secret}
-OPEN_ID_PROVIDER_CACHE_PATH='%kernel.cache_dir%/.well_known_cache.php'
+// direct client to $authUrl
 ```
 
 Note that the default response type and mode
