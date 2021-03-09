@@ -14,7 +14,13 @@ composer require itk-dev/openid-connect
 
 ## Usage
 
-To use the package create a provider and redirect to the authorization url
+To use the package import the namespace
+
+```
+use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
+```
+
+Then create a provider and redirect to the authorization url
 
 ```
 $provider = new OpenIdConfigurationProvider([
@@ -57,15 +63,13 @@ is set in ```OpenIdConfigurationProvider.php```
 'response_mode' => 'query',
 ```
 
-The request should then be handled in some sort of GuardAuthenticator
-
-## Tests
-
-To run tests...
-
 ## Coding standards
 
 The coding standard we use...
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning.
 
 ## License 
 This project is licensed under the MIT License - see the
