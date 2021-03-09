@@ -44,17 +44,18 @@ is set in ```OpenIdConfigurationProvider.php```
 'response_mode' => 'query',
 ```
 
-
 ## Flow
 
 When a user wishes to authenticate themselves, we create an instance of
 `OpenIdConfigurationProvider` and direct them to the authorization url.
-Here the user can authenticate using their Azure B2C login, and if successful be redirected
-back the uri provided when creating the provider instance.
+Here the user can authenticate using their Azure B2C login,
+and if successful be redirected back the uri provided.
 
 ## Coding standard test
 
-The following command let you test that the code follows the coding standard we decided to adhere to in this project.
+The following command let you test that the code follows
+the coding standard we decided to adhere to in this project.
+
 * PHP files (PHP-CS-Fixer)
 
     ```
@@ -63,9 +64,10 @@ The following command let you test that the code follows the coding standard we 
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning. 
+We use [SemVer](http://semver.org/) for versioning.
 See LINK HERE for versions available.
 
-## License 
+## License
+
 This project is licensed under the MIT License - see the
 [LICENSE.md](LICENSE.md) file for details
