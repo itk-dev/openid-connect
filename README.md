@@ -25,7 +25,7 @@ When a user wishes to authenticate themselves, we create an instance of
 `OpenIdConfigurationProvider` and direct them to the authorization url this provides.
 Here the user can authenticate and if successful be redirected back the uri provided.
 During verification of the response from the authorizer we can extract
-information about the user from the `id_token`.
+information about the user from the `id_token`, depending on which claims are supported.
 
 ## Usage
 
@@ -97,7 +97,7 @@ check out [naevnssekretariatet](https://github.com/itk-dev/naevnssekretariatet):
 * How to [bind $openIdProviderOptions](https://github.com/itk-dev/naevnssekretariatet/blob/develop/config/services.yaml)
 * How to [set the environment variables](https://github.com/itk-dev/naevnssekretariatet/blob/develop/.env)
 * How to [create provider and redirect user](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Controller/DefaultController.php)
-* How to [handle and verify response](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Security/OpenIdLoginAuthenticator.php)
+* How to [process and verify response](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Security/OpenIdLoginAuthenticator.php)
 
 ## Coding standard tests
 
