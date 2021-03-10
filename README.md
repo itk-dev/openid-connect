@@ -24,13 +24,13 @@ yarn add markdownlint-cli --dev
 When a user wishes to authenticate themselves, we create an instance of
 `OpenIdConfigurationProvider` and direct them to the authorization url this provides.
 Here the user can authenticate and if successful be redirected back the uri provided.
-During verification of the response from authorizer we can extract information about
+During verification of the response from the authorizer we can extract information about
 the user from the `id_token`.
 
 ## Usage
 
-To use the package import the namespace, create
-a provider and direct to the authorization url.
+To use the package import the namespace, create and configure
+a provider and then direct them to the authorization url.
 
 ```sh
 <?php
