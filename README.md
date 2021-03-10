@@ -15,7 +15,7 @@ composer require itk-dev/openid-connect
 
 ## Usage
 
-To use the package import the namespace, create 
+To use the package import the namespace, create
 a provider and direct to the authorization url.
 
 ```sh
@@ -59,13 +59,16 @@ public function login(SessionInterface $session, array $openIdProviderOptions = 
     ] + $openIdProviderOptions);
 
     $authUrl = $provider->getAuthorizationUrl();
-
+    
+    // Set oauth2state and check it upon receiving respose to avoid CSRF
     $session->set('oauth2state', $provider->getState());
 
     return new RedirectResponse($authUrl);
 }
 ```
-If you wish to see the flow in a Symfony project:
+
+If you wish to see the package used in a Symfony project:
+
 * How to [bind $openIdProviderOptions](https://github.com/itk-dev/naevnssekretariatet/blob/develop/config/services.yaml)
 * How to [set the environment variables](https://github.com/itk-dev/naevnssekretariatet/blob/develop/.env)
 * How to [create provider and redirect user](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Controller/DefaultController.php)
@@ -74,8 +77,8 @@ If you wish to see the flow in a Symfony project:
 ## Flow
 
 When a user wishes to authenticate themselves, we create an instance of
-`OpenIdConfigurationProvider` and direct them to the authorization url.
-Here the user can authenticate using their Azure B2C login,
+`OpenIdConfigurationProvider` and direct them to the authorization url this provides.
+Here the user can authenticate 
 and if successful be redirected back the uri provided.
 
 ## Coding standard tests
