@@ -13,6 +13,20 @@ To install run
 composer require itk-dev/openid-connect
 ```
 
+If you wish to run the coding standard tests for Markdown files
+
+```
+yarn add markdownlint-cli --dev
+```
+
+## Flow
+
+When a user wishes to authenticate themselves, we create an instance of
+`OpenIdConfigurationProvider` and direct them to the authorization url this provides.
+Here the user can authenticate
+and if successful be redirected back the uri provided.
+
+
 ## Usage
 
 To use the package import the namespace, create
@@ -69,19 +83,13 @@ public function login(SessionInterface $session, array $openIdProviderOptions = 
 }
 ```
 
-If you wish to see the package used in a Symfony project:
+If you wish to see the package used in a Symfony project
+check out [naevnssekretariatet](https://github.com/itk-dev/naevnssekretariatet):
 
 * How to [bind $openIdProviderOptions](https://github.com/itk-dev/naevnssekretariatet/blob/develop/config/services.yaml)
 * How to [set the environment variables](https://github.com/itk-dev/naevnssekretariatet/blob/develop/.env)
 * How to [create provider and redirect user](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Controller/DefaultController.php)
 * How to [handle and verify response](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Security/OpenIdLoginAuthenticator.php).
-
-## Flow
-
-When a user wishes to authenticate themselves, we create an instance of
-`OpenIdConfigurationProvider` and direct them to the authorization url this provides.
-Here the user can authenticate
-and if successful be redirected back the uri provided.
 
 ## Coding standard tests
 
