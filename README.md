@@ -24,8 +24,8 @@ yarn add markdownlint-cli --dev
 When a user wishes to authenticate themselves, we create an instance of
 `OpenIdConfigurationProvider` and direct them to the authorization url this provides.
 Here the user can authenticate and if successful be redirected back the uri provided.
-During verification of the response from the authorizer we can extract information about
-the user from the `id_token`.
+During verification of the response from the authorizer we can extract
+information about the user from the `id_token`.
 
 ## Usage
 
@@ -62,6 +62,11 @@ is set in ```OpenIdConfigurationProvider.php```
 
 ### Symfony usage example
 
+In Symfony, we create a login route that when accessed starts
+the authentication flow. Upon creating an instance of
+`OpenIdConfigurationProvider` we configure it with a return URI,
+a cache path and some authorizer details.
+
 ```sh
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 
@@ -82,6 +87,9 @@ public function login(SessionInterface $session, array $openIdProviderOptions = 
     return new RedirectResponse($authUrl);
 }
 ```
+
+The response from the authorizer should then be processed by a
+[Guard Authenticator](https://symfony.com/doc/current/security/guard_authentication.html).
 
 If you wish to see the package used in a Symfony project
 check out [naevnssekretariatet](https://github.com/itk-dev/naevnssekretariatet):
