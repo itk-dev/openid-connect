@@ -2,7 +2,8 @@
 
 # OpenID Connect
 
-Composer package for OpenID Connect via Azure B2C
+Composer package for configuring OpenID Connect via
+[OpenID Connect Discovery document](https://openid.net/specs/openid-connect-discovery-1_0.html).
 
 ## Installation
 
@@ -14,21 +15,22 @@ composer require itk-dev/openid-connect
 
 ## Usage
 
-To use the package import the namespace
+To use the package import the namespace, create 
+a provider and direct to the authorization url.
 
-```
+```sh
+<?php
+
+require_once __DIR__.'/vendor/autoload.php';
+
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
-```
 
-Then create a provider and direct to the authorization url
-
-```
 $provider = new OpenIdConfigurationProvider([
     'redirectUri' => 'https://some.url', // Absolute url to where the user is redirected after a successful login            
-    'urlConfiguration' => 'https:/.../openid-configuration', // url to OpenId configuration
-    'cachePath' => '/some/directory/openId-cache.php', // Path for caching above configuration document
-    'clientId'=> 'client_id', // Client id assigned by Azure
-    'clientSecret'=> 'client_secret', // Client password assigned by Azure
+    'urlConfiguration' => 'https:/.../openid-configuration', // url to OpenId Discovery document
+    'cachePath' => '/some/directory/openId-cache.php', // Path for caching above discovery document
+    'clientId'=> 'client_id', // Client id assigned by authorizer
+    'clientSecret'=> 'client_secret', // Client password assigned by authorizer
  ]);
 
 $authUrl = $provider->getAuthorizationUrl();
@@ -39,10 +41,35 @@ $authUrl = $provider->getAuthorizationUrl();
 Note that the default response type and mode
 is set in ```OpenIdConfigurationProvider.php```
 
-```
+```sh
 'response_type' => 'id_token',
 'response_mode' => 'query',
 ```
+
+### Symfony usage example
+
+```sh
+/**
+  * @Route("/login", name="login")
+  */
+public function login(SessionInterface $session, array $openIdProviderOptions = []): Response
+{
+    $provider = new OpenIdConfigurationProvider([
+        'redirectUri' => $this->generateUrl('some_route_here', [], UrlGeneratorInterface::ABSOLUTE_URL),
+    ] + $openIdProviderOptions);
+
+    $authUrl = $provider->getAuthorizationUrl();
+
+    $session->set('oauth2state', $provider->getState());
+
+    return new RedirectResponse($authUrl);
+}
+```
+If you wish to see the flow in a Symfony project:
+* How to [bind $openIdProviderOptions](https://github.com/itk-dev/naevnssekretariatet/blob/develop/config/services.yaml)
+* How to [set the environment variables](https://github.com/itk-dev/naevnssekretariatet/blob/develop/.env)
+* How to [create provider and redirect user](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Controller/DefaultController.php)
+* How to [handle and verify response](https://github.com/itk-dev/naevnssekretariatet/blob/develop/src/Security/OpenIdLoginAuthenticator.php).
 
 ## Flow
 
@@ -51,15 +78,21 @@ When a user wishes to authenticate themselves, we create an instance of
 Here the user can authenticate using their Azure B2C login,
 and if successful be redirected back the uri provided.
 
-## Coding standard test
+## Coding standard tests
 
 The following command let you test that the code follows
 the coding standard we decided to adhere to in this project.
 
 * PHP files (PHP-CS-Fixer)
 
-    ```
+    ```sh
     ./vendor/bin/php-cs-fixer fix src --dry-run
+    ```
+
+* Markdown files (markdownlint standard rules)
+  
+    ```sh
+    ./node_modules/.bin/markdownlint --fix *.md
     ```
 
 ## Versioning
