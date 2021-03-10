@@ -80,7 +80,7 @@ If you wish to see the package used in a Symfony project:
 
 When a user wishes to authenticate themselves, we create an instance of
 `OpenIdConfigurationProvider` and direct them to the authorization url this provides.
-Here the user can authenticate 
+Here the user can authenticate
 and if successful be redirected back the uri provided.
 
 ## Coding standard tests
@@ -103,7 +103,8 @@ the coding standard we decided to adhere to in this project.
 ## Versioning
 
 We use [SemVer](http://semver.org/) for versioning.
-See LINK HERE for versions available.
+For the versions available, see the
+[tags on this repository](https://github.com/itk-dev/openid-connect/tags).
 
 ## License
 
