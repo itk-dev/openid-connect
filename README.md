@@ -49,6 +49,8 @@ is set in ```OpenIdConfigurationProvider.php```
 ### Symfony usage example
 
 ```sh
+use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
+
 /**
   * @Route("/login", name="login")
   */
