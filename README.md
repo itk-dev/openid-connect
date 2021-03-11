@@ -16,7 +16,7 @@ composer require itk-dev/openid-connect
 If you wish to run the coding standard tests for Markdown files
 
 ```sh
-yarn add markdownlint-cli --dev
+yarn install
 ```
 
 ## Flow
@@ -113,7 +113,7 @@ the coding standard we decided to adhere to in this project.
 * Markdown files (markdownlint standard rules)
   
     ```sh
-    ./node_modules/.bin/markdownlint --fix *.md
+    yarn coding-standards-check
     ```
 
 ## Versioning
