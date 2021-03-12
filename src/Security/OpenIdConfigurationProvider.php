@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ItkDev\OpenIdConnect;
+namespace ItkDev\OpenIdConnect\Security;
 
 use League\OAuth2\Client\Provider\GenericProvider;
 use League\OAuth2\Client\Token\AccessToken;
