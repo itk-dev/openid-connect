@@ -30,9 +30,7 @@ information about the user from the `id_token`, depending on which claims are su
 To use the package import the namespace, create and configure
 a provider and then direct them to the authorization url.
 
-```sh
-<?php
-
+```php
 require_once __DIR__.'/vendor/autoload.php';
 
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
@@ -53,7 +51,7 @@ $authUrl = $provider->getAuthorizationUrl();
 Note that the default response type and mode
 is set in ```OpenIdConfigurationProvider.php```
 
-```sh
+```php
 'response_type' => 'id_token',
 'response_mode' => 'query',
 ```
@@ -65,7 +63,7 @@ the authentication flow. Upon creating an instance of
 `OpenIdConfigurationProvider` we configure it with a return URI,
 a cache path and some authorizer details.
 
-```sh
+```php
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 
 /**
