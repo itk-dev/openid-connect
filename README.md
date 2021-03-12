@@ -1,5 +1,3 @@
-# Work in progress
-
 # OpenID Connect
 
 Composer package for configuring OpenID Connect via

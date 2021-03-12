@@ -10,4 +10,4 @@
 ###< friendsofphp/php-cs-fixer ###
 /node_modules/
 
-/composer.lock/
+/composer.lock
