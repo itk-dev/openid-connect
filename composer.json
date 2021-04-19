@@ -20,5 +20,13 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^2.18"
+    },
+    "scripts": {
+        "apply-coding-standards": [
+            "php-cs-fixer --config=.php_cs.dist fix"
+        ],
+        "check-coding-standards": [
+            "php-cs-fixer --config=.php_cs.dist fix --dry-run --format=checkstyle"
+        ]
     }
 }

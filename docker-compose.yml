@@ -1,0 +1,20 @@
+# itk-version: 1.0.0
+
+version: "3"
+
+networks:
+  app:
+    driver: bridge
+    internal: false
+
+services:
+  phpfpm:
+    image: itkdev/php7.4-fpm:latest
+    networks:
+      - app
+    environment:
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_SESSION=${XDEBUG_SESSION:-0}
+      - COMPOSER_VERSION=2
+    volumes:
+      - .:/app:delegated
