@@ -30,35 +30,14 @@ class OpenIdConfigurationProvider extends GenericProvider
     protected $cacheDuration = 24 * 60 * 60;
 
     /**
-     * @var array|null
+     * @var null|array
      */
     private $cache;
 
     /**
-     * {@inheritDoc}
-     */
-    protected function getConfigurableOptions()
-    {
-        return array_merge(parent::getConfigurableOptions(), [
-            'cacheDuration',
-        ]);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    protected function getRequiredOptions()
-    {
-        return [
-            'urlConfiguration',
-            'cachePath',
-        ];
-    }
-
-    /**
      * {@inheritdoc}
      */
-    public function getBaseAuthorizationUrl()
+    public function getBaseAuthorizationUrl(): string
     {
         return $this->getConfiguration('authorization_endpoint');
     }
@@ -66,20 +45,20 @@ class OpenIdConfigurationProvider extends GenericProvider
     /**
      * {@inheritdoc}
      */
-    public function getAuthorizationUrl(array $options = [])
+    public function getAuthorizationUrl(array $options = []): string
     {
         // Add default options scope, response_type and response_mode
         return parent::getAuthorizationUrl($options + [
-                'scope' => 'openid',
-                'response_type' => 'id_token',
-                'response_mode' => 'query',
-            ]);
+            'scope' => 'openid',
+            'response_type' => 'id_token',
+            'response_mode' => 'query',
+        ]);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getBaseAccessTokenUrl(array $params)
+    public function getBaseAccessTokenUrl(array $params): string
     {
         return $this->getConfiguration('token_endpoint');
     }
@@ -87,7 +66,7 @@ class OpenIdConfigurationProvider extends GenericProvider
     /**
      * {@inheritdoc}
      */
-    public function getResourceOwnerDetailsUrl(AccessToken $token)
+    public function getResourceOwnerDetailsUrl(AccessToken $token): string
     {
         return $this->getConfiguration('userinfo_endpoint');
     }
@@ -118,6 +97,29 @@ class OpenIdConfigurationProvider extends GenericProvider
             throw new \Exception('Cannot save OpenID configuration cache file.');
         }
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected function getConfigurableOptions(): array
+    {
+        return array_merge(parent::getConfigurableOptions(), [
+            'cacheDuration',
+        ]);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected function getRequiredOptions(): array
+    {
+        return [
+            'urlConfiguration',
+            'cachePath',
+        ];
+    }
+
+
 
     /**
      * Get Configuration.
