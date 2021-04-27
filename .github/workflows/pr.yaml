@@ -80,79 +80,40 @@ jobs:
         run: |
           bash <(curl -s https://codecov.io/bash) -F Unit -f coverage/unit.xml
 
-#
-#    runner-phpcs:
-#        runs-on: ubuntu-latest
-#        strategy:
-#          fail-fast: false
-#          matrix:
-#            php: ['7.2', '7.4', '8.0']
-#        name: Coding style (${{ matrix.php }})
-#        steps:
-#            - uses: actions/checkout@master
-#
-#            - name: Setup PHP, with composer and extensions
-#              uses: shivammathur/setup-php@v2
-#              with:
-#                  php-version: ${{ matrix.php }}
-#                  extension: apcu, ctype, iconv, imagick, json, redis, soap, xmlreader, zip
-#                  coverage: none
-#
-#            - name: Get composer cache directory
-#              id: composer-cache
-#              run: echo "::set-output name=dir::$(composer config cache-files-dir)"
-#
-#            - name: Cache dependencies
-#              uses: actions/cache@v2
-#              with:
-#                path: ${{ steps.composer-cache.outputs.dir }}
-#                key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-#                restore-keys: ${{ runner.os }}-composer-
-#
-#            - name: Install Dependencies
-#              run: composer install -q --no-ansi --no-interaction --no-scripts --no-suggest --no-progress --prefer-dist
-#
-#            - name: PHPCS
-#              run: composer actions/phpcs | ./reviewdog -f=checkstyle -name=PHPCS -reporter=github-pr-check
-#              env:
-#                  REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  runner-phpcs:
+    name: Coding style (${{ matrix.php}}) / (${{ matrix.dependency-version}})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ '7.4' ]
+    steps:
+      - uses: actions/checkout@master
 
-#      - name: PHPCS
-#        run: |
-#          composer coding-standards-check -- --report=checkstyle | cs2pr
+      - name: Setup PHP, with composer and extensions
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php}}
+          coverage: xdebug
+          tools: cs2pr
 
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
 
-#
-#    phpcsfixer:
-#        runs-on: ubuntu-latest
-#        strategy:
-#          fail-fast: false
-#          matrix:
-#            php: ['7.2', '7.4', '8.0']
-#        name: Coding style fixer (${{ matrix.php }})
-#        steps:
-#            - uses: actions/checkout@master
-#
-#            - name: Setup PHP, with composer and extensions
-#              uses: shivammathur/setup-php@v2
-#              with:
-#                  php-version: ${{ matrix.php }}
-#                  extension: apcu, ctype, iconv, imagick, json, redis, soap, xmlreader, zip
-#                  coverage: none
-#
-#            - name: Get composer cache directory
-#              id: composer-cache
-#              run: echo "::set-output name=dir::$(composer config cache-files-dir)"
-#
-#            - name: Cache dependencies
-#              uses: actions/cache@v2
-#              with:
-#                path: ${{ steps.composer-cache.outputs.dir }}
-#                key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-#                restore-keys: ${{ runner.os }}-composer-
-#
-#            - name: Install Dependencies
-#              run: composer install -q --no-ansi --no-interaction --no-scripts --no-suggest --no-progress --prefer-dist
-#
-#            - name: phpcsfixerr
-#              run: composer actions/phpcsfixer
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}-${{ matrix.dependency-version }}-
+          restore-keys: ${{ runner.os }}-composer-${{ matrix.dependency-version }}-
+
+      - name: Validate composer files
+        run: composer validate composer.json --strict
+
+      - name: Install dependencies
+        run: |
+          composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
+
+      - name: php-cs-fixer
+        run: composer check-coding-standards --report=checkstyle | cs2pr
