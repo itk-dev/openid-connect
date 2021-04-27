@@ -71,14 +71,14 @@ jobs:
         run: |
           composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
 
-    - name: Unit tests
-      run: ./vendor/bin/phpunit --coverage-clover=coverage/unit.xml
+      - name: Unit tests
+        run: ./vendor/bin/phpunit --coverage-clover=coverage/unit.xml
 
-    - name: Report coverage to Codecov
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      run: |
-        bash <(curl -s https://codecov.io/bash) -F Unit -f coverage/unit.xml
+      - name: Report coverage to Codecov
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          bash <(curl -s https://codecov.io/bash) -F Unit -f coverage/unit.xml
 
 #
 #    runner-phpcs:
