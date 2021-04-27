@@ -113,4 +113,4 @@ jobs:
           composer update --prefer-dist --no-interaction
 
       - name: php-cs-fixer
-        run: composer check-coding-standards --report=checkstyle | cs2pr
+        run: composer check-coding-standards | cs2pr
