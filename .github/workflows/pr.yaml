@@ -37,7 +37,7 @@ jobs:
           composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
 
   unit-tests:
-    name: Unit tests (${{ matrix.php}}) / (${{ matrix.dependency-version}})
+    name: Unit tests (${{ matrix.php}})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -105,15 +105,12 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}-${{ matrix.dependency-version }}-
-          restore-keys: ${{ runner.os }}-composer-${{ matrix.dependency-version }}-
-
-      - name: Validate composer files
-        run: composer validate composer.json --strict
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer
 
       - name: Install dependencies
         run: |
-          composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
+          composer update --prefer-dist --no-interaction
 
       - name: php-cs-fixer
         run: composer check-coding-standards --report=checkstyle | cs2pr
