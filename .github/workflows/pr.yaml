@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: [ '7.3', '7.4', '8.0' ]
+        php: ['7.4']
     steps:
       - uses: actions/checkout@master
 
@@ -115,6 +115,4 @@ jobs:
         run: ./vendor/bin/phpcs --report-full --report-checkstyle=./phpcs-report.xml
 
       - name: Show PHPCS results in PR
-        run: |
-          cat ./phpcs-report.xml
-          cs2pr ./phpcs-report.xml
+        run: ./vendor/bin/phpcs ./phpcs-report.xml
