@@ -38,7 +38,7 @@ jobs:
           composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
 
   unit-tests:
-    name: Unit tests (${{ matrix.php}})
+    name: Unit tests (${{ matrix.php}}) / (${{ matrix.dependency-version}})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -111,4 +111,4 @@ jobs:
           composer update --prefer-stable --prefer-dist --no-interaction
 
       - name: PHPCS
-        run: composer check-coding-standards | cs2pr
+        run: composer check-coding-standards -- --report=checkstyle | cs2pr
