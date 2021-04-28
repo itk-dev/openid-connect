@@ -111,4 +111,4 @@ jobs:
           composer update --prefer-stable --prefer-dist --no-interaction
 
       - name: PHPCS
-        run: composer check-coding-standards -- --report=checkstyle | cs2pr
+        run: ./vendor/bin/phpcs --standard=phpcs.xml.dist --report=checkstyle | cs2pr
