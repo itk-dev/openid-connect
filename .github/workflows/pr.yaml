@@ -36,6 +36,20 @@ jobs:
         run: |
           composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
 
+  php-cs-fixer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Run php-cs-fixer
+        uses: docker://oskarstark/php-cs-fixer-ga
+
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Apply php-cs-fixer changes
+
   unit-tests:
     name: Unit tests (${{ matrix.php}})
     runs-on: ubuntu-latest
@@ -79,38 +93,3 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
           bash <(curl -s https://codecov.io/bash) -F Unit -f coverage/unit.xml
-
-  runner-phpcs:
-    name: Coding style (${{ matrix.php}}) / (${{ matrix.dependency-version}})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: [ '7.4' ]
-    steps:
-      - uses: actions/checkout@master
-
-      - name: Setup PHP, with composer and extensions
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php}}
-          coverage: xdebug
-          tools: cs2pr
-
-      - name: Get composer cache directory
-        id: composer-cache
-        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
-
-      - name: Cache dependencies
-        uses: actions/cache@v2
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
-          restore-keys: ${{ runner.os }}-composer
-
-      - name: Install dependencies
-        run: |
-          composer update --prefer-dist --no-interaction
-
-      - name: php-cs-fixer
-        run: ./vendor/bin/php-cs-fixer fix --dry-run --format=checkstyle | cs2pr
