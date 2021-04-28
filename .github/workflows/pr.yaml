@@ -1,6 +1,7 @@
 on: pull_request
 name: Test & Code Style Review
 jobs:
+
   test-composer-install:
     name: Validate composer (${{ matrix.php}}) / (${{ matrix.dependency-version}})
     runs-on: ubuntu-latest
@@ -36,16 +37,6 @@ jobs:
         run: |
           composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
 
-  php-cs-fixer:
-    name: PHP-CS-Fixer
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: PHP-CS-Fixer
-        uses: docker://oskarstark/php-cs-fixer-ga
-        with:
-          args: --diff --dry-run
-
   unit-tests:
     name: Unit tests (${{ matrix.php}})
     runs-on: ubuntu-latest
@@ -74,9 +65,6 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}-${{ matrix.dependency-version }}-
           restore-keys: ${{ runner.os }}-composer-${{ matrix.dependency-version }}-
 
-      - name: Validate composer files
-        run: composer validate composer.json --strict
-
       - name: Install dependencies
         run: |
           composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
@@ -89,3 +77,33 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
           bash <(curl -s https://codecov.io/bash) -F Unit -f coverage/unit.xml
+
+  phpcs:
+    name: PHP Code Sniffer (${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ '7.3', '7.4', '8.0' ]
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Setup PHP, with composer and extensions
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php}}
+          coverage: none
+          tools: cs2pr
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}-
+          restore-keys: ${{ runner.os }}-composer-
+      - name: PHPCS
+        run: composer check-coding-standards | cs2pr
