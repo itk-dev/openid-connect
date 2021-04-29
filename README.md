@@ -67,6 +67,15 @@ docker compose up -d
 docker compose exec phpfpm composer install
 ```
 
+### Unit Testing
+
+A standard PhpUnit setup is included in this library. To run the unit tests:
+
+    ```shell
+    docker compose exec phpfpm composer install
+    docker compose exec phpfpm ./vendor/bin/phpunit
+    ``` 
+
 ### Check Coding Standard
 
 The following command let you test that the code follows
