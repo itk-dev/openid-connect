@@ -110,6 +110,16 @@ To attempt to automatically fix coding style
     docker run -v ${PWD}:/app itkdev/yarn:latest install
     docker run -v ${PWD}:/app itkdev/yarn:latest check-coding-standards
     ```
+  
+## CI
+
+Github Actions are used to run the test suite and code style checks on all PR's. 
+
+If you wish to test against the jobs locally you can install `act` (https://github.com/nektos/act). 
+Then do:  
+  ```shell
+  act -P ubuntu-latest=shivammathur/node:latest pull_request
+  ```
 
 ## Versioning
 
