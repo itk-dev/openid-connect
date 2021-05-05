@@ -22,7 +22,7 @@ use RuntimeException;
  */
 class OpenIdConfigurationProvider extends AbstractProvider
 {
-    private CONST CACHE_KEY = 'itk-openid-connect-configuration';
+    private const CACHE_KEY = 'itk-openid-connect-configuration';
 
     /**
      * @var string
@@ -44,6 +44,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     public function __construct(array $options = [], array $collaborators = [])
     {
+        parent::__construct($options, $collaborators);
+
         if (!array_key_exists('cacheItemPool', $options)) {
             throw new \InvalidArgumentException(
                 'Required options not defined: cacheItemPool'
@@ -57,12 +59,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
             );
         }
         $this->setOpenIDConnectMetadataUrl($options['openIDConnectMetadataUrl']);
-
-        // The parent will attempt to set these again if we don't remove them.
-//        unset($options['cacheItemPool']);
-//        unset($options['openIDConnectMetadataUrl']);
-
-        parent::__construct($options, $collaborators);
     }
 
     /**
@@ -152,9 +148,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Refresh Cache.
+     * Fetch OpenID Connect Metadata
      *
-     * OpenIDConnectMetadata
+     * @return array
+     *   Array of configuration values
      *
      * @throws ItkOpenIdConnectException
      */
@@ -170,7 +167,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $content = $response->getBody()->getContents();
 
             return json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-
         } catch (GuzzleException $e) {
             // @TODO 1
         } catch (RuntimeException $e) {
@@ -181,7 +177,13 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Get Configuration for key.
+     * Get Configuration option for key.
+     *
+     * @param string $key
+     *  The configuration key
+     *
+     * @return string
+     *   The configuration value for the given key
      */
     private function getConfiguration(string $key): string
     {
@@ -194,12 +196,12 @@ class OpenIdConfigurationProvider extends AbstractProvider
             }
 
             if (isset($configuration[$key])) {
-                return $configuration[$key];
+                $value = $configuration[$key];
             } else {
-                throw new \InvalidArgumentException(
-                    'Required config key not defined: '.$key
-                );
+                throw new \InvalidArgumentException('Required config key not defined: ' . $key);
             }
+
+            return $value;
         } catch (InvalidArgumentException $e) {
             // @TODO 1
         } catch (ItkOpenIdConnectException $e) {
@@ -208,7 +210,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Set the provider cache itm pool
+     * Set the provider cache item pool
      *
      * @param CacheItemPoolInterface $cacheItemPool
      */
@@ -227,11 +229,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
     private function setOpenIDConnectMetadataUrl(string $url): void
     {
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new ItkOpenIdConnectException('OpenIDConnectMetadataUrl is invalid: '.$url);
+            throw new ItkOpenIdConnectException('OpenIDConnectMetadataUrl is invalid: ' . $url);
         }
 
         if (parse_url($url, PHP_URL_SCHEME) !== 'https') {
-            throw new ItkOpenIdConnectException('OpenIDConnectMetadataUrl must use https: '.$url);
+            throw new ItkOpenIdConnectException('OpenIDConnectMetadataUrl must use https: ' . $url);
         }
 
         $this->openIDConnectMetadataUrl = $url;

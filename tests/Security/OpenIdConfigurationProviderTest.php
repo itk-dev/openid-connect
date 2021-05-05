@@ -27,7 +27,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         parent::setUp();
 
-        $mockOPenIdConfiguration = file_get_contents(__DIR__. '/../MockData/openIdConfiguration.json');
+        $mockOPenIdConfiguration = file_get_contents(__DIR__ . '/../MockData/openIdConfiguration.json');
 
         $mockStream = $this->createMock(StreamInterface::class);
         $mockStream->method('getContents')->willReturn($mockOPenIdConfiguration);
