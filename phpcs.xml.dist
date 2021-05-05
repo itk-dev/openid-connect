@@ -15,7 +15,6 @@
     <arg name="extensions" value="php"/>
 
     <rule ref="PSR12"/>
-    <rule ref="Symfony"/>
 
     <rule ref="Generic.Files.LineLength">
         <exclude-pattern>*</exclude-pattern>
