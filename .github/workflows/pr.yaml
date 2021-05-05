@@ -115,4 +115,4 @@ jobs:
         run: ./vendor/bin/phpcs --report-full --report-checkstyle=./phpcs-report.xml
 
       - name: Show PHPCS results in PR
-        run: ./vendor/bin/phpcs ./phpcs-report.xml
+        run: cs2pr ./phpcs-report.xml
