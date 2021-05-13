@@ -38,8 +38,8 @@ use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 
 $provider = new OpenIdConfigurationProvider([
     'redirectUri' => 'https://some.url', // Absolute url to where the user is redirected after a successful login            
-    'urlConfiguration' => 'https:/.../openid-configuration', // url to OpenId Discovery document
-    'cachePath' => '/some/directory/openId-cache.php', // Path for caching above discovery document
+    'openIDConnectMetadataUrl' => 'https:/.../openid-configuration', // url to OpenId Discovery document
+    'cacheItemPool' => '/some/directory/openId-cache.php', // Path for caching above discovery document
     'clientId' => 'client_id', // Client id assigned by authorizer
     'clientSecret' => 'client_secret', // Client password assigned by authorizer
  ]);
@@ -110,6 +110,16 @@ To attempt to automatically fix coding style
     docker run -v ${PWD}:/app itkdev/yarn:latest install
     docker run -v ${PWD}:/app itkdev/yarn:latest check-coding-standards
     ```
+  
+## CI
+
+Github Actions are used to run the test suite and code style checks on all PR's. 
+
+If you wish to test against the jobs locally you can install `act` (https://github.com/nektos/act). 
+Then do:  
+  ```shell
+  act -P ubuntu-latest=shivammathur/node:latest pull_request
+  ```
 
 ## Versioning
 

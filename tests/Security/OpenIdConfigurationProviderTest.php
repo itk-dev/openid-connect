@@ -4,12 +4,16 @@ namespace Security;
 
 use GuzzleHttp\ClientInterface;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
+use League\OAuth2\Client\Token\AccessToken;
 use PHPUnit\Framework\TestCase;
+use Psr\Cache\CacheItemInterface;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
 /**
  * @internal
+ *
  * @coversNothing
  */
 class OpenIdConfigurationProviderTest extends TestCase
@@ -23,7 +27,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         parent::setUp();
 
-        $mockOPenIdConfiguration = file_get_contents(__DIR__.'/../MockData/openIdConfiguration.json');
+        $mockOPenIdConfiguration = file_get_contents(__DIR__ . '/../MockData/openIdConfiguration.json');
 
         $mockStream = $this->createMock(StreamInterface::class);
         $mockStream->method('getContents')->willReturn($mockOPenIdConfiguration);
@@ -35,13 +39,19 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockHttpClient = $this->createMock(ClientInterface::class);
         $mockHttpClient->method('request')->willReturn($mockResponse);
 
+        $cacheItemMock = $this->createMock(CacheItemInterface::class);
+        $cacheItemMock->method('isHit')->willReturn(false);
+
+        $cacheItemPoolMock = $this->createMock(CacheItemPoolInterface::class);
+        $cacheItemPoolMock->method('getItem')->willReturn($cacheItemMock);
+
         $this->provider = new OpenIdConfigurationProvider([
-            'urlConfiguration' => 'https://some.url/openid-configuration',
-            'cachePath' => __DIR__.'/openId-cache.php',
+            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'cacheItemPool' => $cacheItemPoolMock,
             'clientId' => 'test_client_id',
             'clientSecret' => 'test_client_secret',
             'redirectUri' => 'https://redirect.url',
-        ], [
+            ], [
             'httpClient' => $mockHttpClient,
         ]);
 
@@ -73,10 +83,5 @@ class OpenIdConfigurationProviderTest extends TestCase
         $expected = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
 
         $this->assertSame($expected, $tokenUrl);
-    }
-
-    public function testGetResourceOwnerDetailsUrl(): void
-    {
-        // @TODO
     }
 }
