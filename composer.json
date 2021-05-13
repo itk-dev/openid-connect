@@ -16,8 +16,11 @@
     "require": {
         "php": "^7.3|^8.0",
         "ext-json": "*",
+        "ext-openssl": "*",
         "league/oauth2-client": "^2.6",
-        "psr/cache": "^1.0"
+        "firebase/php-jwt": "^5.2",
+        "psr/cache": "^1.0",
+        "robrichards/xmlseclibs": "^3.1"
     },
     "autoload": {
         "psr-4": {
@@ -27,7 +30,8 @@
     "require-dev": {
         "phpunit/phpunit": "^9.5",
         "dealerdirect/phpcodesniffer-composer-installer": "^0.7.1",
-        "escapestudios/symfony2-coding-standard": "^3.12"
+        "escapestudios/symfony2-coding-standard": "^3.12",
+        "mockery/mockery": "^1.4"
     },
     "scripts": {
         "test": "./vendor/bin/phpunit",
