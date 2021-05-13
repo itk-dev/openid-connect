@@ -4,11 +4,10 @@ namespace Security;
 
 use Firebase\JWT\SignatureInvalidException;
 use GuzzleHttp\ClientInterface;
+use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
-use League\OAuth2\Client\Token\AccessToken;
 use Mockery\Adapter\Phpunit\MockeryTestCase;
-use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -76,13 +75,34 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
 
     public function testGetAuthorizationUrl(): void
     {
-        $authUrl = $this->provider->getAuthorizationUrl();
+        $state = '12345678';
+        $nonce = 'abcdefghij';
+
+        $authUrl = $this->provider->getAuthorizationUrl(['state' => $state, 'nonce' => $nonce]);
         $query = [];
         parse_str(parse_url($authUrl, PHP_URL_QUERY), $query);
 
-        $this->assertSame($query['scope'], 'openid');
-        $this->assertSame($query['response_type'], 'id_token');
-        $this->assertSame($query['response_mode'], 'query');
+        $this->assertSame('openid', $query['scope']);
+        $this->assertSame('id_token', $query['response_type']);
+        $this->assertSame('query', $query['response_mode']);
+        $this->assertSame($state, $query['state']);
+        $this->assertSame($nonce, $query['nonce']);
+    }
+
+    public function testGetAuthorizationUrlStateException(): void
+    {
+        $this->expectException(ItkOpenIdConnectException::class);
+        $this->expectExceptionMessage('Required parameter "state" missing');
+
+        $authUrl = $this->provider->getAuthorizationUrl(['nonce' => 'abcd']);
+    }
+
+    public function testGetAuthorizationUrlNonceException(): void
+    {
+        $this->expectException(ItkOpenIdConnectException::class);
+        $this->expectExceptionMessage('Required parameter "nonce" missing');
+
+        $authUrl = $this->provider->getAuthorizationUrl(['state' => 'abcd']);
     }
 
     public function testGetBaseAccessTokenUrl(): void
