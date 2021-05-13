@@ -6,6 +6,12 @@ Composer package for configuring OpenID Connect via
 This library is made and tested for use with [Azure AD B2C](https://docs.microsoft.com/en-us/azure/active-directory-b2c/)
 but should be usable for other OpenID Connect providers.
 
+## References
+
+[OpenID Connect Implicit Client Implementer's Guide 1.0](https://openid.net/specs/openid-connect-implicit-1_0.html)  
+[Azure Active Directory B2C documentation](https://docs.microsoft.com/en-us/azure/active-directory-b2c/)  
+[Web sign-in with OpenID Connect in Azure Active Directory B2C](https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-authentication-requests)
+
 ## Usage
 
 ### Framework
