@@ -26,7 +26,7 @@ use RuntimeException;
  */
 class OpenIdConfigurationProvider extends AbstractProvider
 {
-    private const CACHE_KEY = 'itk-openid-connect-configuration';
+    private const CACHE_KEY = 'itk-openid-connect-configuration-';
 
     /**
      * @var string
@@ -41,7 +41,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * @var int
      */
-    private $cacheDuration;
+    private $cacheDuration = 86400;
 
     /**
      * OpenIdConfigurationProvider constructor.
@@ -61,6 +61,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
             );
         }
         $this->setCacheItemPool($options['cacheItemPool']);
+
+        if (array_key_exists('cacheDuration', $options)) {
+            $this->setCacheDuration($options['cacheDuration']);
+        }
 
         if (!array_key_exists('openIDConnectMetadataUrl', $options)) {
             throw new \InvalidArgumentException(
@@ -84,6 +88,17 @@ class OpenIdConfigurationProvider extends AbstractProvider
     public function setCacheItemPool(CacheItemPoolInterface $cacheItemPool): void
     {
         $this->cacheItemPool = $cacheItemPool;
+    }
+
+    /**
+     * Set the provider cache duration
+     *
+     * @param int $cacheDuration
+     *   The cache duration in seconds
+     */
+    public function setCacheDuration(int $cacheDuration): void
+    {
+        $this->cacheDuration = $cacheDuration;
     }
 
     /**
@@ -113,7 +128,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         // Prevent these option from being set by direct access by the
         // parent constructor.
-        return ['cacheItemPool', 'openIDConnectMetadataUrl'];
+        return ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl'];
     }
 
     /**
@@ -149,6 +164,38 @@ class OpenIdConfigurationProvider extends AbstractProvider
             'response_type' => 'id_token',
             'response_mode' => 'query',
         ]);
+    }
+
+    /**
+     * Do any required verification of the id token and return an array of decoded claims
+     *
+     * @param string $idToken
+     *   Raw id token as string
+     *
+     * @return object The JWT's payload as a PHP object
+     *
+     * @throws IdentityProviderException
+     * @throws ItkOpenIdConnectException
+     */
+    public function validateIdToken(string $idToken, string $nonce): \stdClass
+    {
+        try {
+            $keys = $this->getJwtVerificationKeys();
+            $claims = JWT::decode($idToken, $keys, ['RS256']);
+            if ($claims->aud !== $this->clientId) {
+                throw new IdentityProviderException('ID token has incorrect audience', 0, $claims->aud);
+            }
+            if ($claims->iss !== $this->getConfiguration('issuer')) {
+                throw new IdentityProviderException('ID token has incorrect issuer', 0, $claims->iss);
+            }
+            if ($claims->nonce !== $nonce) {
+                throw new IdentityProviderException('ID token has incorrect nonce', 0, $claims->nonce);
+            }
+
+            return $claims;
+        } catch (\UnexpectedValueException $e) {
+            throw new IdentityProviderException("ID token validation failed", 0, $e->getMessage());
+        }
     }
 
     /**
@@ -215,38 +262,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Do any required verification of the id token and return an array of decoded claims
-     *
-     * @param string $idToken
-     *   Raw id token as string
-     *
-     * @return object The JWT's payload as a PHP object
-     *
-     * @throws IdentityProviderException
-     * @throws ItkOpenIdConnectException
-     */
-    public function validateIdToken(string $idToken, string $nonce): \stdClass
-    {
-        try {
-            $keys = $this->getJwtVerificationKeys();
-            $claims = JWT::decode($idToken, $keys, ['RS256']);
-            if ($claims->aud !== $this->clientId) {
-                throw new IdentityProviderException('ID token has incorrect audience', 0, $claims->aud);
-            }
-            if ($claims->iss !== $this->getConfiguration('issuer')) {
-                throw new IdentityProviderException('ID token has incorrect issuer', 0, $claims->iss);
-            }
-            if ($claims->nonce !== $nonce) {
-                throw new IdentityProviderException('ID token has incorrect nonce', 0, $claims->nonce);
-            }
-
-            return $claims;
-        } catch (\UnexpectedValueException $e) {
-            throw new IdentityProviderException("ID token validation failed", 0, $e->getMessage());
-        }
-    }
-
-    /**
      * Get JWT verification keys from Azure Active Directory.
      *
      * @return array
@@ -256,20 +271,36 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function getJwtVerificationKeys(): array
     {
-        $keysUri = $this->getConfiguration('jwks_uri');
-        $jwks = $this->fetchJsonResource($keysUri);
-
+        $cacheKey = self::CACHE_KEY . 'jwks';
         $keys = [];
-        foreach ($jwks['keys'] as $key) {
-            $kid = $key['kid'];
-            if ($key['kty'] === 'RSA') {
-                $e = self::base64urlDecode($key['e']);
-                $n = self::base64urlDecode($key['n']);
-                $keys[$kid] = XMLSecurityKey::convertRSA($n, $e);
+
+        try {
+            $item = $this->cacheItemPool->getItem($cacheKey);
+
+            if ($item->isHit()) {
+                $keys = $item->get();
             } else {
-                throw new ItkOpenIdConnectException('Unsupported key data for key id: ' . $kid);
+                $keysUri = $this->getConfiguration('jwks_uri');
+                $jwks = $this->fetchJsonResource($keysUri);
+
+                foreach ($jwks['keys'] as $key) {
+                    $kid = $key['kid'];
+                    if ($key['kty'] === 'RSA') {
+                        $e = self::base64urlDecode($key['e']);
+                        $n = self::base64urlDecode($key['n']);
+                        $keys[$kid] = XMLSecurityKey::convertRSA($n, $e);
+                    } else {
+                        throw new ItkOpenIdConnectException('Unsupported key data for key id: ' . $kid);
+                    }
+                }
+
+                $item->set($keys);
+                $item->expiresAfter($this->cacheDuration);
             }
+        } catch (InvalidArgumentException $e) {
+            // @TODO 1
         }
+
         return $keys;
     }
 
