@@ -4,7 +4,9 @@ namespace Security;
 
 use Firebase\JWT\SignatureInvalidException;
 use GuzzleHttp\ClientInterface;
+use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
+use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use Mockery\Adapter\Phpunit\MockeryTestCase;
@@ -128,7 +130,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
         $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
 
-        $this->expectException(IdentityProviderException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('ID token validation failed');
 
         $this->provider->validateIdToken('token', self::NONCE);
@@ -142,7 +144,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
-        $this->expectException(IdentityProviderException::class);
+        $this->expectException(ClaimsException::class);
         $this->expectExceptionMessage('ID token has incorrect audience');
 
         $this->provider->validateIdToken('token', self::NONCE);
@@ -156,7 +158,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
-        $this->expectException(IdentityProviderException::class);
+        $this->expectException(ClaimsException::class);
         $this->expectExceptionMessage('ID token has incorrect issuer');
 
         $this->provider->validateIdToken('token', self::NONCE);
@@ -170,7 +172,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
-        $this->expectException(IdentityProviderException::class);
+        $this->expectException(ClaimsException::class);
         $this->expectExceptionMessage('ID token has incorrect nonce');
 
         $this->provider->validateIdToken('token', self::NONCE);
