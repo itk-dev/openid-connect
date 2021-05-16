@@ -2,7 +2,7 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class ItkOpenIdConnectException extends \Exception
+abstract class ItkOpenIdConnectException extends \Exception
 {
 
 }
