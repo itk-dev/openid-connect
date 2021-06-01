@@ -358,6 +358,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $configuration = $this->fetchJsonResource($this->openIDConnectMetadataUrl);
                 $item->set($configuration);
                 $item->expiresAfter($this->cacheDuration);
+                $this->cacheItemPool->save($item);
             }
 
             if (isset($configuration[$key])) {
