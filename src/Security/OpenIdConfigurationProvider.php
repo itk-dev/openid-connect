@@ -199,6 +199,22 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
+     * Generates a new random string to use as the state parameter in an
+     * authorization flow.
+     *
+     * @param  int $length
+     *   Length of the random string to be generated.
+     * @return string
+     *   The generated state
+     */
+    public function generateState(int $length = 32)
+    {
+        $this->state = parent::getRandomState($length);
+        
+        return $this->state;
+    }
+
+    /**
      * Generates a new random string to use as the nonce parameter in an
      * authorization flow.
      *

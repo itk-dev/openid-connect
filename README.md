@@ -92,7 +92,7 @@ when the user is redirected back to your application.
 
 ```php
 // Get "state" and "nonce"
-$state = $provider->getRandomState();
+$state = $provider->generateState();
 $nonce = $provider->generateNonce();
 
 // Save to session

@@ -64,6 +64,19 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
             'httpClient' => $mockHttpClient,
         ]);
     }
+    
+    public function testGenerateState(): void
+    {
+        $state = $this->provider->generateState(32);
+        $this->assertSame(32, strlen($state));
+        $this->assertSame($state, $this->provider->getState());
+    }
+
+    public function testGenerateNonce(): void
+    {
+        $nonce = $this->provider->generateNonce(32);
+        $this->assertSame(32, strlen($nonce));
+    }
 
     public function testGetBaseAuthorizationUrl(): void
     {
