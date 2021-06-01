@@ -210,7 +210,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     public function generateState(int $length = 32)
     {
         $this->state = parent::getRandomState($length);
-        
+
         return $this->state;
     }
 

@@ -64,7 +64,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
             'httpClient' => $mockHttpClient,
         ]);
     }
-    
+
     public function testGenerateState(): void
     {
         $state = $this->provider->generateState(32);
