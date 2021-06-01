@@ -30,6 +30,10 @@ To install this library directly run
 composer require itk-dev/openid-connect
 ```
 
+To use the library you must provide a cache implementation of [PSR-6: Caching Interface](https://www.php-fig.org/psr/psr-6/).
+Look to [PHP Cache](http://www.php-cache.com/en/latest/) for documentation and 
+implementations.
+
 ### Direct usage
 
 #### Flow
@@ -55,7 +59,7 @@ use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 $provider = new OpenIdConfigurationProvider([
     'redirectUri' => 'https://some.url', // Absolute url to where the user is redirected after a successful login            
     'openIDConnectMetadataUrl' => 'https:/.../openid-configuration', // url to OpenId Discovery document
-    'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Pool for caching above discovery document
+    'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Implementation of CacheItemPoolInterface for caching above discovery document
     'clientId' => 'client_id', // Client id assigned by authorizer
     'clientSecret' => 'client_secret', // Client password assigned by authorizer
  ]);
