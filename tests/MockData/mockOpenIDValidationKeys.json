@@ -1,0 +1,11 @@
+{
+  "keys": [
+    {
+      "kid": "111111111111111111111111111111111111111111",
+      "use": "sig",
+      "kty": "RSA",
+      "e": "ABCD",
+      "n": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij-abcdefghijabcdefghijabcdefghij-abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabc-abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcde-abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+    }
+  ]
+}

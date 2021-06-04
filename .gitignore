@@ -11,3 +11,7 @@
 /node_modules/
 
 /composer.lock
+build
+.phpcs-cache
+phpcs-report.xml
+.phpunit.result.cache

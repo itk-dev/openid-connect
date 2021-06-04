@@ -7,11 +7,20 @@
         {
             "name": "Jeppe Kuhlmann Andersen",
             "email": "jekua@aarhus.dk"
+        },
+        {
+            "name": "Ture Gjørup",
+            "email": "tug@aarhus.dk"
         }
     ],
     "require": {
-        "php": ">=7.2.5",
-        "league/oauth2-client": "^2.6"
+        "php": "^7.3|^8.0",
+        "ext-json": "*",
+        "ext-openssl": "*",
+        "league/oauth2-client": "^2.6",
+        "firebase/php-jwt": "^5.2",
+        "psr/cache": "^1.0",
+        "robrichards/xmlseclibs": "^3.1"
     },
     "autoload": {
         "psr-4": {
@@ -19,14 +28,25 @@
         }
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^2.18"
+        "phpunit/phpunit": "^9.5",
+        "dealerdirect/phpcodesniffer-composer-installer": "^0.7.1",
+        "escapestudios/symfony2-coding-standard": "^3.12",
+        "mockery/mockery": "^1.4",
+        "vimeo/psalm": "^4.7"
     },
     "scripts": {
+        "test": "./vendor/bin/phpunit",
         "apply-coding-standards": [
-            "php-cs-fixer --config=.php_cs.dist fix"
+            "phpcbf --standard=phpcs.xml.dist"
         ],
         "check-coding-standards": [
-            "php-cs-fixer --config=.php_cs.dist fix --dry-run --format=checkstyle"
+            "phpcs --standard=phpcs.xml.dist"
+        ],
+        "install-codestandards": [
+            "Dealerdirect\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\Plugin::run"
+        ],
+        "post-install-cmd": [
+            "@install-codestandards"
         ]
     }
 }
