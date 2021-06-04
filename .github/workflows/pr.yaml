@@ -116,3 +116,13 @@ jobs:
 
       - name: Show PHPCS results in PR
         run: cs2pr ./phpcs-report.xml
+
+  psalm:
+    name: Psalm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Psalm
+        uses: docker://vimeo/psalm-github-actions

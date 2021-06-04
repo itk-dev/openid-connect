@@ -31,7 +31,8 @@
         "phpunit/phpunit": "^9.5",
         "dealerdirect/phpcodesniffer-composer-installer": "^0.7.1",
         "escapestudios/symfony2-coding-standard": "^3.12",
-        "mockery/mockery": "^1.4"
+        "mockery/mockery": "^1.4",
+        "vimeo/psalm": "^4.7"
     },
     "scripts": {
         "test": "./vendor/bin/phpunit",
