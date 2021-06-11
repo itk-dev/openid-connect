@@ -219,7 +219,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         try {
             $keys = $this->getJwtVerificationKeys();
-            JWT::leeway($this->leeway);
+            JWT::$leeway = $this->leeway;
             $claims = JWT::decode($idToken, $keys, ['RS256']);
             if ($claims->aud !== $this->clientId) {
                 throw new ClaimsException('ID token has incorrect audience: ' . $claims->aud);
