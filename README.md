@@ -62,6 +62,7 @@ $provider = new OpenIdConfigurationProvider([
     'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Implementation of CacheItemPoolInterface for caching above discovery document
     'clientId' => 'client_id', // Client id assigned by authorizer
     'clientSecret' => 'client_secret', // Client password assigned by authorizer
+    'leeway' => 0, // Leeway in seconds to account for clock skew times between the signing and verifying servers (Defaults to 0)
  ]);
  ```
 

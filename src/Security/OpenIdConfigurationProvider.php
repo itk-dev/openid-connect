@@ -57,6 +57,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
     private $responseResourceOwnerId = 'id';
 
     /**
+     * @var int
+     */
+    private $leeway = 0;
+
+    /**
      * OpenIdConfigurationProvider constructor.
      *
      * @param array $options
@@ -93,6 +98,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
         $this->setRequestFactory($collaborators['jwt']);
 
         $this->setOpenIDConnectMetadataUrl($options['openIDConnectMetadataUrl']);
+
+        if (array_key_exists('leeway', $options)) {
+            $this->setLeeway($options['leeway']);
+        }
     }
 
     /**
@@ -134,6 +143,20 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
 
         $this->openIDConnectMetadataUrl = $url;
+    }
+
+    /**
+     * Set leeway in seconds to account for clock skew times between the signing and verifying servers.
+     *
+     * @param int $leeway
+     */
+    public function setLeeway(int $leeway)
+    {
+        if ($leeway < 0) {
+            throw new \InvalidArgumentException('Leeway must be a positive integer.');
+        }
+
+        $this->leeway = $leeway;
     }
 
     /**
@@ -196,6 +219,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         try {
             $keys = $this->getJwtVerificationKeys();
+            JWT::leeway($this->leeway);
             $claims = JWT::decode($idToken, $keys, ['RS256']);
             if ($claims->aud !== $this->clientId) {
                 throw new ClaimsException('ID token has incorrect audience: ' . $claims->aud);
