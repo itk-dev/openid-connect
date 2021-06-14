@@ -1,6 +1,6 @@
 <?php
 
-namespace Security;
+namespace Tests\Security;
 
 use Firebase\JWT\SignatureInvalidException;
 use GuzzleHttp\ClientInterface;
@@ -127,9 +127,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->assertSame($expected, $tokenUrl);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenSuccess(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
@@ -137,9 +140,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenFailure(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
 
         $this->expectException(ValidationException::class);
@@ -148,9 +154,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenAudience(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = 'incorrect aud';
 
@@ -162,9 +171,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenIssuer(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->iss = 'incorrect iss';
 
@@ -176,9 +188,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenNonce(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->nonce = 'incorrect nonce';
 
