@@ -57,11 +57,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
     private $responseResourceOwnerId = 'id';
 
     /**
-     * @var int
-     */
-    private $leeway = 0;
-
-    /**
      * OpenIdConfigurationProvider constructor.
      *
      * @param array $options
