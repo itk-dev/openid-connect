@@ -11,6 +11,7 @@ use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
+use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
@@ -201,7 +202,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     public function validateIdToken(string $idToken, string $nonce, int $leeway = 0): object
     {
         if ($leeway < 0) {
-            throw new \InvalidArgumentException('$leeway has to be a positive integer');
+            throw new NegativeLeewayException('Leeway has to be a positive integer');
         }
 
         try {
