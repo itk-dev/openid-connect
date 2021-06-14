@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [2.1.0] - 2021-06-14
 ### Added
 
 - Leeway option when validating id token
 
-## [2.0.0] - 2021-04-06
+## [2.0.0] - 2021-06-04
 
 ### Added
 
