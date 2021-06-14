@@ -62,7 +62,6 @@ $provider = new OpenIdConfigurationProvider([
     'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Implementation of CacheItemPoolInterface for caching above discovery document
     'clientId' => 'client_id', // Client id assigned by authorizer
     'clientSecret' => 'client_secret', // Client password assigned by authorizer
-    'leeway' => 0, // Leeway in seconds to account for clock skew times between the signing and verifying servers (Defaults to 0)
  ]);
  ```
 
@@ -141,6 +140,18 @@ try {
 } finally {
     $this->session->remove('oauth2nonce');
 }
+```
+
+##### Leeway
+
+to account for clock skew times between the signing and verifying servers, 
+you can set a leeway when validating the id token:
+
+```php
+// Se above example for more info about verifying authorized requests
+// Leeway is an optional third parameter on the validateIdToken method.
+
+$claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'), 10);
 ```
 
 ## Development Setup

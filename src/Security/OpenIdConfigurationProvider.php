@@ -98,10 +98,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
         $this->setRequestFactory($collaborators['jwt']);
 
         $this->setOpenIDConnectMetadataUrl($options['openIDConnectMetadataUrl']);
-
-        if (array_key_exists('leeway', $options)) {
-            $this->setLeeway($options['leeway']);
-        }
     }
 
     /**
@@ -143,20 +139,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
 
         $this->openIDConnectMetadataUrl = $url;
-    }
-
-    /**
-     * Set leeway in seconds to account for clock skew times between the signing and verifying servers.
-     *
-     * @param int $leeway
-     */
-    public function setLeeway(int $leeway)
-    {
-        if ($leeway < 0) {
-            throw new \InvalidArgumentException('Leeway must be a positive integer.');
-        }
-
-        $this->leeway = $leeway;
     }
 
     /**
@@ -215,11 +197,32 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @throws ItkOpenIdConnectException
      */
-    public function validateIdToken(string $idToken, string $nonce): object
+
+    /**
+     * Do any required verification of the id token and return an array of decoded claims
+     *
+     * @param string $idToken
+     *   Raw id token as string
+     *
+     * @param string $nonce
+     *   Nonce as string
+     *
+     * @param int $leeway
+     *   Leeway set in seconds. Defaults to 0 and must be positive
+     *
+     * @return object
+     *
+     * @throws ItkOpenIdConnectException
+     */
+    public function validateIdToken(string $idToken, string $nonce, int $leeway = 0): object
     {
+        if ($leeway < 0) {
+            throw new \InvalidArgumentException('$leeway has to be a positive integer');
+        }
+
         try {
             $keys = $this->getJwtVerificationKeys();
-            JWT::$leeway = $this->leeway;
+            JWT::$leeway = $leeway;
             $claims = JWT::decode($idToken, $keys, ['RS256']);
             if ($claims->aud !== $this->clientId) {
                 throw new ClaimsException('ID token has incorrect audience: ' . $claims->aud);
