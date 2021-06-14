@@ -185,27 +185,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Do any required verification of the id token and return an array of decoded claims
      *
      * @param string $idToken
-     *   Raw id token as string
-     *
-     * @return object
-     *   The JWT's payload as a PHP object
-     *
-     * @throws ItkOpenIdConnectException
-     */
-
-    /**
-     * Do any required verification of the id token and return an array of decoded claims
-     *
-     * @param string $idToken
-     *   Raw id token as string
+     *   Raw id token
      *
      * @param string $nonce
-     *   Nonce as string
+     *   Nonce
      *
      * @param int $leeway
      *   Leeway set in seconds. Defaults to 0 and must be positive
      *
      * @return object
+     *   The JWT's payload as a PHP object
      *
      * @throws ItkOpenIdConnectException
      */
