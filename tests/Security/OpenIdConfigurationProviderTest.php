@@ -5,6 +5,7 @@ namespace Tests\Security;
 use Firebase\JWT\SignatureInvalidException;
 use GuzzleHttp\ClientInterface;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
+use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
@@ -203,6 +204,17 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->expectExceptionMessage('ID token has incorrect nonce');
 
         $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function testValidateIdTokenNegativeLeewayFailure(): void
+    {
+        $this->expectException(NegativeLeewayException::class);
+        $this->expectExceptionMessage('Leeway has to be a positive integer');
+
+        $this->provider->validateIdToken('token', self::NONCE, -1);
     }
 
     /**
