@@ -1,10 +1,11 @@
 <?php
 
-namespace Security;
+namespace Tests\Security;
 
 use Firebase\JWT\SignatureInvalidException;
 use GuzzleHttp\ClientInterface;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
+use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
@@ -127,9 +128,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->assertSame($expected, $tokenUrl);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenSuccess(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
@@ -137,9 +141,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenFailure(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
 
         $this->expectException(ValidationException::class);
@@ -148,9 +155,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenAudience(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = 'incorrect aud';
 
@@ -162,9 +172,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenIssuer(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->iss = 'incorrect iss';
 
@@ -176,9 +189,12 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * @runInSeparateProcess
+     */
     public function testValidateIdTokenNonce(): void
     {
-        $mockJWT = \Mockery::mock('alias:Firebase\JWT\JWT');
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->nonce = 'incorrect nonce';
 
@@ -188,6 +204,17 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->expectExceptionMessage('ID token has incorrect nonce');
 
         $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function testValidateIdTokenNegativeLeewayFailure(): void
+    {
+        $this->expectException(NegativeLeewayException::class);
+        $this->expectExceptionMessage('Leeway has to be a positive integer');
+
+        $this->provider->validateIdToken('token', self::NONCE, -1);
     }
 
     /**

@@ -11,6 +11,7 @@ use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
+use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
@@ -185,17 +186,28 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Do any required verification of the id token and return an array of decoded claims
      *
      * @param string $idToken
-     *   Raw id token as string
+     *   Raw id token
+     *
+     * @param string $nonce
+     *   Nonce
+     *
+     * @param int $leeway
+     *   Leeway set in seconds. Defaults to 0 and must be positive
      *
      * @return object
      *   The JWT's payload as a PHP object
      *
      * @throws ItkOpenIdConnectException
      */
-    public function validateIdToken(string $idToken, string $nonce): object
+    public function validateIdToken(string $idToken, string $nonce, int $leeway = 0): object
     {
+        if ($leeway < 0) {
+            throw new NegativeLeewayException('Leeway has to be a positive integer');
+        }
+
         try {
             $keys = $this->getJwtVerificationKeys();
+            JWT::$leeway = $leeway;
             $claims = JWT::decode($idToken, $keys, ['RS256']);
             if ($claims->aud !== $this->clientId) {
                 throw new ClaimsException('ID token has incorrect audience: ' . $claims->aud);

@@ -142,6 +142,24 @@ try {
 }
 ```
 
+##### Leeway
+
+To account for clock skew times between the signing and verifying servers, 
+you can set a leeway when validating the id token:
+
+```php
+// Se above example for more info about verifying authorized requests
+// Leeway is an optional third parameter on the validateIdToken method.
+// This will throw a NegativeLeewayException of leeway isn't positive.
+
+$claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'), 10);
+```
+
+It is recommended that this leeway should not be bigger than a few minutes.
+For more information see the following:
+* [firebase/php-jwt](https://github.com/firebase/php-jwt#example): Last entry in the example mentions the leeway option.
+* [JWT documentation](http://self-issued.info/docs/draft-ietf-oauth-json-web-token.html#nbfDef)
+
 ## Development Setup
 
 A `docker-compose.yml` file with a PHP 7.4 image is included in this project.
