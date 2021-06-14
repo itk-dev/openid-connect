@@ -8,9 +8,9 @@ but should be usable for other OpenID Connect providers.
 
 ## References
 
-[OpenID Connect Implicit Client Implementer's Guide 1.0](https://openid.net/specs/openid-connect-implicit-1_0.html)  
-[Azure Active Directory B2C documentation](https://docs.microsoft.com/en-us/azure/active-directory-b2c/)  
-[Web sign-in with OpenID Connect in Azure Active Directory B2C](https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-authentication-requests)
+* [OpenID Connect Implicit Client Implementer's Guide 1.0](https://openid.net/specs/openid-connect-implicit-1_0.html)  
+* [Azure Active Directory B2C documentation](https://docs.microsoft.com/en-us/azure/active-directory-b2c/)  
+* [Web sign-in with OpenID Connect in Azure Active Directory B2C](https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-authentication-requests)
 
 ## Usage
 
@@ -31,7 +31,7 @@ composer require itk-dev/openid-connect
 ```
 
 To use the library you must provide a cache implementation of [PSR-6: Caching Interface](https://www.php-fig.org/psr/psr-6/).
-Look to [PHP Cache](http://www.php-cache.com/en/latest/) for documentation and 
+Look to [PHP Cache](http://www.php-cache.com/en/latest/) for documentation and
 implementations.
 
 ### Direct usage
@@ -144,7 +144,7 @@ try {
 
 ##### Leeway
 
-To account for clock skew times between the signing and verifying servers, 
+To account for clock skew times between the signing and verifying servers,
 you can set a leeway when validating the id token:
 
 ```php
@@ -157,7 +157,10 @@ $claims = $provider->validateIdToken($request->query->get('id_token'), $session-
 
 It is recommended that this leeway should not be bigger than a few minutes.
 For more information see the following:
-* [firebase/php-jwt](https://github.com/firebase/php-jwt#example): Last entry in the example mentions the leeway option.
+
+* [firebase/php-jwt](https://github.com/firebase/php-jwt#example)
+  Last entry in the example mentions the leeway option.
+
 * [JWT documentation](http://self-issued.info/docs/draft-ietf-oauth-json-web-token.html#nbfDef)
 
 ## Development Setup
