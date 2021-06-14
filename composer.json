@@ -11,6 +11,10 @@
         {
             "name": "Ture Gjørup",
             "email": "tug@aarhus.dk"
+        },
+        {
+            "name": "Lars Steen Risom",
+            "email": "lats@aarhus.dk"
         }
     ],
     "require": {
