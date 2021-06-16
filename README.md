@@ -124,9 +124,9 @@ values
 ```php
 // Validate that the request state and session state match
 $sessionState = $this->session->get('oauth2state');
+$this->session->remove('oauth2state');
 if (!$sessionState || $request->query->get('state') !== $sessionState) {
-    $this->session->remove('oauth2state');
-    throw new ItkOpenIdConnectException('Invalid state');
+    throw new ValidationException('Invalid state');
 }
 
 // Validate the id token. This will validate the token against the keys published by the 
@@ -135,7 +135,7 @@ if (!$sessionState || $request->query->get('state') !== $sessionState) {
 try {
     $claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
     // Authentication successful
-} catch (IdentityProviderException $exception) {
+} catch (ItkOpenIdConnectException $exception) {
     // Handle failed authentication
 } finally {
     $this->session->remove('oauth2nonce');
