@@ -120,6 +120,27 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $authUrl = $this->provider->getAuthorizationUrl(['state' => 'abcd']);
     }
 
+    public function testGetEndSessionUrl(): void
+    {
+        // Defined in MockData/mockOpenIDConfiguration.json
+        $expected = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/logout?p=test-policy';
+
+        $endSessionUrl = $this->provider->getEndSessionUrl();
+        $this->assertSame($expected, $endSessionUrl);
+
+        $expectedUrl = $expected . '&post_logout_redirect_uri=https%3A%2F%2Flogout.test';
+        $endSessionUrl = $this->provider->getEndSessionUrl('https://logout.test');
+        $this->assertSame($expectedUrl, $endSessionUrl);
+
+        $expectedState = $expected . '&state=test-state';
+        $endSessionUrl = $this->provider->getEndSessionUrl(null, 'test-state');
+        $this->assertSame($expectedState, $endSessionUrl);
+
+        $expectedBoth = $expected . '&post_logout_redirect_uri=https%3A%2F%2Flogout.test' . '&state=test-state';
+        $endSessionUrl = $this->provider->getEndSessionUrl('https://logout.test', 'test-state');
+        $this->assertSame($expectedBoth, $endSessionUrl);
+    }
+
     public function testGetBaseAccessTokenUrl(): void
     {
         $tokenUrl = $this->provider->getBaseAccessTokenUrl([]);
