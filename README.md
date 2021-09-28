@@ -1,5 +1,13 @@
 # OpenID Connect
 
+[![Github](https://img.shields.io/badge/source-itk--dev/openid--connect-blue?style=flat-square)](https://github.com/itk-dev/openid-connect)
+[![Release](https://img.shields.io/packagist/v/itk-dev/openid-connect.svg?style=flat-square&label=release)](https://packagist.org/packages/itk-dev/openid-connect)
+[![PHP Version](https://img.shields.io/packagist/php-v/itk-dev/openid-connect.svg?style=flat-square&colorB=%238892BF)](https://www.php.net/downloads)
+[![Build Status](https://img.shields.io/github/workflow/status/itk-dev/openid-connect/Test%20%26%20Code%20Style%20Review?label=CI&logo=github&style=flat-square)](https://github.com/itk-dev/openid-connect/actions?query=workflow%3A%22Test+%26+Code+Style+Review%22)
+[![Codecov Code Coverage](https://img.shields.io/codecov/c/gh/itk-dev/openid-connect?label=codecov&logo=codecov&style=flat-square)](https://codecov.io/gh/itk-dev/openid-connect)
+[![Read License](https://img.shields.io/packagist/l/itk-dev/openid-connect.svg?style=flat-square&colorB=darkcyan)](https://github.com/itk-dev/openid-connect/blob/master/LICENSE.md)
+[![Package downloads on Packagist](https://img.shields.io/packagist/dt/itk-dev/openid-connect.svg?style=flat-square&colorB=darkmagenta)](https://packagist.org/packages/itk-dev/openid-connect/stats)
+
 Composer package for configuring OpenID Connect via
 [OpenID Connect Discovery document](https://openid.net/specs/openid-connect-discovery-1_0.html).
 
@@ -124,9 +132,9 @@ values
 ```php
 // Validate that the request state and session state match
 $sessionState = $this->session->get('oauth2state');
+$this->session->remove('oauth2state');
 if (!$sessionState || $request->query->get('state') !== $sessionState) {
-    $this->session->remove('oauth2state');
-    throw new ItkOpenIdConnectException('Invalid state');
+    throw new ValidationException('Invalid state');
 }
 
 // Validate the id token. This will validate the token against the keys published by the 
@@ -135,7 +143,7 @@ if (!$sessionState || $request->query->get('state') !== $sessionState) {
 try {
     $claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
     // Authentication successful
-} catch (IdentityProviderException $exception) {
+} catch (ItkOpenIdConnectException $exception) {
     // Handle failed authentication
 } finally {
     $this->session->remove('oauth2nonce');
