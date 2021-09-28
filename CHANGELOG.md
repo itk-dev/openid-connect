@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed 
 - Updated CHANGELOG
+- Added badges to Readme
 
 ### Fixed
 - Update validation example in README
