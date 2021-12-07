@@ -35,7 +35,7 @@ use RobRichards\XMLSecLibs\XMLSecurityKey;
  */
 class OpenIdConfigurationProvider extends AbstractProvider
 {
-    private const CACHE_KEY = 'itk-openid-connect-configuration-';
+    private const CACHE_KEY_PREFIX = 'itk-openid-connect-configuration-';
     private const POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
     private const STATE = 'state';
 
@@ -353,7 +353,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function getJwtVerificationKeys(): array
     {
-        $cacheKey = self::CACHE_KEY . 'jwks';
+        $cacheKey = $this->getCacheKey('jwks');
 
         $keys = [];
 
@@ -457,7 +457,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function getConfiguration(string $key): string
     {
-        $cacheKey = self::CACHE_KEY . 'configuration';
+        $cacheKey = $this->getCacheKey('configuration');
 
         try {
             assert($this->cacheItemPool instanceof CacheItemPoolInterface);
@@ -481,5 +481,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage());
         }
+    }
+
+    private function getCacheKey(string $name): string
+    {
+        return implode('||', [
+            self::CACHE_KEY_PREFIX,
+            hash('sha1', $this->openIDConnectMetadataUrl),
+            $name,
+        ]);
     }
 }
