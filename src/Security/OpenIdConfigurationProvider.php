@@ -21,6 +21,7 @@ use ItkDev\OpenIdConnect\Exception\ValidationException;
 use League\OAuth2\Client\Provider\AbstractProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use League\OAuth2\Client\Provider\GenericResourceOwner;
+use League\OAuth2\Client\Provider\ResourceOwnerInterface;
 use League\OAuth2\Client\Token\AccessToken;
 use League\OAuth2\Client\Tool\RequestFactory;
 use Psr\Cache\CacheItemPoolInterface;
@@ -39,25 +40,15 @@ class OpenIdConfigurationProvider extends AbstractProvider
     private const POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
     private const STATE = 'state';
 
-    /**
-     * @var string
-     */
-    protected $openIDConnectMetadataUrl;
+    protected string $openIDConnectMetadataUrl;
 
-    /**
-     * @var CacheItemPoolInterface|null
-     */
-    private $cacheItemPool;
+    private ?CacheItemPoolInterface $cacheItemPool;
 
-    /**
-     * @var int
-     */
-    private $cacheDuration = 86400;
+    private int $cacheDuration = 86400;
+    
+    private int $leeway = 10;
 
-    /**
-     * @var string
-     */
-    private $responseResourceOwnerId = 'id';
+    private string $responseResourceOwnerId = 'id';
 
     /**
      * OpenIdConfigurationProvider constructor.
@@ -82,6 +73,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $this->setCacheDuration($options['cacheDuration']);
         }
 
+        if (array_key_exists('leeway', $options) && is_int($options['leeway'])) {
+            $this->setLeeway($options['leeway']);
+        }
+
         if (!array_key_exists('openIDConnectMetadataUrl', $options)) {
             throw new \InvalidArgumentException(
                 'Required options not defined: openIDConnectMetadataUrl'
@@ -97,54 +92,13 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Set the provider cache item pool
-     *
-     * @param CacheItemPoolInterface $cacheItemPool
-     */
-    public function setCacheItemPool(CacheItemPoolInterface $cacheItemPool): void
-    {
-        $this->cacheItemPool = $cacheItemPool;
-    }
-
-    /**
-     * Set the provider cache duration
-     *
-     * @param int $cacheDuration
-     *   The cache duration in seconds
-     */
-    public function setCacheDuration(int $cacheDuration): void
-    {
-        $this->cacheDuration = $cacheDuration;
-    }
-
-    /**
-     * Set the OpenID Connect Metadata Url
-     *
-     * @param string $url
-     *
-     * @throws ItkOpenIdConnectException
-     */
-    public function setOpenIDConnectMetadataUrl(string $url): void
-    {
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: ' . $url);
-        }
-
-        if (parse_url($url, PHP_URL_SCHEME) !== 'https') {
-            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: ' . $url);
-        }
-
-        $this->openIDConnectMetadataUrl = $url;
-    }
-
-    /**
      * {@inheritdoc}
      */
-    public function getGuarded()
+    public function getGuarded(): array
     {
         // Prevent these option from being set by direct access by the
         // parent constructor.
-        return ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl'];
+        return ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway'];
     }
 
     /**
@@ -225,23 +179,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @param string $nonce
      *   Nonce
      *
-     * @param int $leeway
-     *   Leeway set in seconds. Defaults to 0 and must be positive
-     *
      * @return object
      *   The JWT's payload as a PHP object
      *
      * @throws ItkOpenIdConnectException
      */
-    public function validateIdToken(string $idToken, string $nonce, int $leeway = 0): object
+    public function validateIdToken(string $idToken, string $nonce): object
     {
-        if ($leeway < 0) {
-            throw new NegativeLeewayException('Leeway has to be a positive integer');
-        }
-
         try {
             $keys = $this->getJwtVerificationKeys();
-            JWT::$leeway = $leeway;
+            JWT::$leeway = $this->leeway;
             $claims = JWT::decode($idToken, $keys, ['RS256']);
             if ($claims->aud !== $this->clientId) {
                 throw new ClaimsException('ID token has incorrect audience: ' . $claims->aud);
@@ -268,7 +215,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @return string
      *   The generated state
      */
-    public function generateState(int $length = 32)
+    public function generateState(int $length = 32): string
     {
         $this->state = parent::getRandomState($length);
 
@@ -284,7 +231,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @return string
      *   The generated nonce
      */
-    public function generateNonce(int $length = 32)
+    public function generateNonce(int $length = 32): string
     {
         return parent::getRandomState($length);
     }
@@ -336,7 +283,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * @inheritdoc
      */
-    protected function createResourceOwner(array $response, AccessToken $token)
+    protected function createResourceOwner(array $response, AccessToken $token): ResourceOwnerInterface
     {
         return new GenericResourceOwner($response, $this->responseResourceOwnerId);
     }
@@ -490,5 +437,64 @@ class OpenIdConfigurationProvider extends AbstractProvider
             hash('sha1', $this->openIDConnectMetadataUrl),
             $name,
         ]);
+    }
+
+    /**
+     * Set the provider cache item pool
+     *
+     * @param CacheItemPoolInterface $cacheItemPool
+     */
+    private function setCacheItemPool(CacheItemPoolInterface $cacheItemPool): void
+    {
+        $this->cacheItemPool = $cacheItemPool;
+    }
+
+    /**
+     * Set the provider cache duration
+     *
+     * @param int $cacheDuration
+     *   The cache duration in seconds
+     */
+    private function setCacheDuration(int $cacheDuration): void
+    {
+        $this->cacheDuration = $cacheDuration;
+    }
+
+    /**
+     * Set the leeway to allow for clock skew between hosting server and provider
+     *
+     * @param int $leeway
+     *   The leeway in seconds. Must be positive
+     *
+     * @return void
+     *
+     * @throws NegativeLeewayException
+     */
+    private function setLeeway(int $leeway): void
+    {
+        if ($leeway < 0) {
+            throw new NegativeLeewayException('Leeway has to be a positive integer');
+        }
+        $this->leeway = $leeway;
+    }
+
+    /**
+     * Set the OpenID Connect Metadata Url
+     *
+     * @param string $url
+     *
+     * @throws ItkOpenIdConnectException
+     */
+    private function setOpenIDConnectMetadataUrl(string $url): void
+    {
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: ' . $url);
+        }
+
+        if (parse_url($url, PHP_URL_SCHEME) !== 'https') {
+            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: ' . $url);
+        }
+
+        $this->openIDConnectMetadataUrl = $url;
     }
 }

@@ -70,8 +70,26 @@ $provider = new OpenIdConfigurationProvider([
     'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Implementation of CacheItemPoolInterface for caching above discovery document
     'clientId' => 'client_id', // Client id assigned by authorizer
     'clientSecret' => 'client_secret', // Client password assigned by authorizer
+    // optional values
+    'leeway' => 30 // Defaults to 10 (seconds)
+    'cacheDuration' => 3600 // Defaults to 86400 (seconds)
  ]);
  ```
+
+##### Leeway
+
+To account for clock skew times between the signing and verifying servers,
+you can set a leeway when configuring the provider. It is recommended that 
+leeway should not be bigger than a few minutes.
+
+Defaults to 10 seconds
+
+For more information see the following:
+
+* [firebase/php-jwt](https://github.com/firebase/php-jwt#example)
+  Last entry in the example mentions the leeway option.
+
+* [JWT documentation](http://self-issued.info/docs/draft-ietf-oauth-json-web-token.html#nbfDef)
 
 #### Non-authorized requests
 
@@ -149,27 +167,6 @@ try {
     $this->session->remove('oauth2nonce');
 }
 ```
-
-##### Leeway
-
-To account for clock skew times between the signing and verifying servers,
-you can set a leeway when validating the id token:
-
-```php
-// Se above example for more info about verifying authorized requests
-// Leeway is an optional third parameter on the validateIdToken method.
-// This will throw a NegativeLeewayException of leeway isn't positive.
-
-$claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'), 10);
-```
-
-It is recommended that this leeway should not be bigger than a few minutes.
-For more information see the following:
-
-* [firebase/php-jwt](https://github.com/firebase/php-jwt#example)
-  Last entry in the example mentions the leeway option.
-
-* [JWT documentation](http://self-issued.info/docs/draft-ietf-oauth-json-web-token.html#nbfDef)
 
 ## Development Setup
 
