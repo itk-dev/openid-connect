@@ -45,7 +45,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     private ?CacheItemPoolInterface $cacheItemPool;
 
     private int $cacheDuration = 86400;
-    
+
     private int $leeway = 10;
 
     private string $responseResourceOwnerId = 'id';
