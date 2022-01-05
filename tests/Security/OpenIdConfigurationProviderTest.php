@@ -205,7 +205,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $endSessionUrl = $this->provider->getEndSessionUrl('https://logout.test', 'test-state');
         $this->assertSame($expectedBoth, $endSessionUrl);
     }
-    
+
 
     public function testGetBaseAccessTokenUrl(): void
     {

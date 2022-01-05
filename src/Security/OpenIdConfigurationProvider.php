@@ -455,7 +455,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @param int $cacheDuration
      *   The cache duration in seconds
-     * 
+     *
      * @throws NegativeCacheDurationException
      */
     private function setCacheDuration(int $cacheDuration): void
