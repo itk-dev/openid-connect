@@ -11,6 +11,7 @@ use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
+use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
@@ -454,9 +455,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @param int $cacheDuration
      *   The cache duration in seconds
+     *
+     * @throws NegativeCacheDurationException
      */
     private function setCacheDuration(int $cacheDuration): void
     {
+        if ($cacheDuration < 0) {
+            throw new NegativeCacheDurationException('Cache Duration has to be a positive integer');
+        }
         $this->cacheDuration = $cacheDuration;
     }
 
