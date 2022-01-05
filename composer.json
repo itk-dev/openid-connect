@@ -18,12 +18,12 @@
         }
     ],
     "require": {
-        "php": "^7.3|^8.0",
+        "php": "^7.4|^8.0|^8.1",
         "ext-json": "*",
         "ext-openssl": "*",
         "league/oauth2-client": "^2.6",
         "firebase/php-jwt": "^5.2",
-        "psr/cache": "^1.0",
+        "psr/cache": "^1.0 || ^2.0 || ^3.0",
         "robrichards/xmlseclibs": "^3.1"
     },
     "autoload": {
@@ -41,7 +41,8 @@
         "dealerdirect/phpcodesniffer-composer-installer": "^0.7.1",
         "escapestudios/symfony2-coding-standard": "^3.12",
         "mockery/mockery": "^1.4",
-        "vimeo/psalm": "^4.7"
+        "vimeo/psalm": "^4.7",
+        "phpunit/php-code-coverage": "^9.2"
     },
     "scripts": {
         "test": "./vendor/bin/phpunit",

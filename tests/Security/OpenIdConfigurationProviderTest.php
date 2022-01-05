@@ -5,30 +5,29 @@ namespace Tests\Security;
 use Firebase\JWT\SignatureInvalidException;
 use GuzzleHttp\ClientInterface;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
+use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
-use Mockery\Adapter\Phpunit\MockeryTestCase;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
-/**
- * @internal
- *
- * @coversNothing
- */
-class OpenIdConfigurationProviderTest extends MockeryTestCase
+class OpenIdConfigurationProviderTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const CLIENT_ID = 'test_client_id';
     private const CLIENT_SECRET = 'test_client_secret';
     private const REDIRECT_URI = 'https://redirect.url';
     private const NONCE = '12345678';
 
     /**
-     * @var OpenIdConfigurationProvider
+     * @var OpenIdConfigurationProvider|null
      */
     private $provider;
 
@@ -62,9 +61,59 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
             'clientId' => self::CLIENT_ID,
             'clientSecret' => self::CLIENT_SECRET,
             'redirectUri' => self::REDIRECT_URI,
+            'cacheDuration' => 3600,
+            'leeway' => 30,
             ], [
             'httpClient' => $mockHttpClient,
         ]);
+    }
+
+    public function testConstructCacheItemPool(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectDeprecationMessage('Required options not defined: cacheItemPool');
+
+        $provider = new OpenIdConfigurationProvider([], []);
+    }
+
+    public function testConstructOpenIDConnectMetadataUrl(): void
+    {
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectDeprecationMessage('Required options not defined: openIDConnectMetadataUrl');
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+        ], []);
+    }
+
+    public function testConstructCacheDuration(): void
+    {
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+
+        $this->expectException(NegativeCacheDurationException::class);
+        $this->expectExceptionMessage('Cache Duration has to be a positive integer');
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'cacheDuration' => -10
+        ], []);
+    }
+
+    public function testConstructLeeway(): void
+    {
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+
+        $this->expectException(NegativeLeewayException::class);
+        $this->expectExceptionMessage('Leeway has to be a positive integer');
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'leeway' => -10
+        ], []);
     }
 
     public function testGenerateState(): void
@@ -86,6 +135,22 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $expected = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy';
 
         $this->assertSame($expected, $authUrl);
+    }
+
+    public function testGetGuarded(): void
+    {
+        $guarded = $this->provider->getGuarded();
+        $expected = ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway'];
+
+        $this->assertSame($expected, $guarded);
+    }
+
+    public function testGetDefaultScopes(): void
+    {
+        $scopes = $this->provider->getDefaultScopes();
+        $expected = ['openid'];
+
+        $this->assertSame($expected, $scopes);
     }
 
     public function testGetAuthorizationUrl(): void
@@ -141,6 +206,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->assertSame($expectedBoth, $endSessionUrl);
     }
 
+
     public function testGetBaseAccessTokenUrl(): void
     {
         $tokenUrl = $this->provider->getBaseAccessTokenUrl([]);
@@ -149,9 +215,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->assertSame($expected, $tokenUrl);
     }
 
-    /**
-     * @runInSeparateProcess
-     */
+
     public function testValidateIdTokenSuccess(): void
     {
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
@@ -162,9 +226,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
-    /**
-     * @runInSeparateProcess
-     */
+
     public function testValidateIdTokenFailure(): void
     {
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
@@ -176,9 +238,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
-    /**
-     * @runInSeparateProcess
-     */
+
     public function testValidateIdTokenAudience(): void
     {
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
@@ -193,9 +253,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
-    /**
-     * @runInSeparateProcess
-     */
+
     public function testValidateIdTokenIssuer(): void
     {
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
@@ -210,9 +268,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
-    /**
-     * @runInSeparateProcess
-     */
+
     public function testValidateIdTokenNonce(): void
     {
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
@@ -225,17 +281,6 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->expectExceptionMessage('ID token has incorrect nonce');
 
         $this->provider->validateIdToken('token', self::NONCE);
-    }
-
-    /**
-     * @runInSeparateProcess
-     */
-    public function testValidateIdTokenNegativeLeewayFailure(): void
-    {
-        $this->expectException(NegativeLeewayException::class);
-        $this->expectExceptionMessage('Leeway has to be a positive integer');
-
-        $this->provider->validateIdToken('token', self::NONCE, -1);
     }
 
     /**
