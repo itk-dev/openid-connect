@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2021-12-08
+### Changed
+- Dropped support for PHP 7.3
+- Changed leeway to be a config option for providers [BC]
+
+### Fixed
+- Fixed coverage for test suite
+
+## [2.3.0] - 2021-12-08
+### Added
+- Include metadata url in cache key (to support multiple providers).
+
 ## [2.2.0] - 2021-09-28
 ### Added
 - Function to get the logout / end session url from the config metadata
