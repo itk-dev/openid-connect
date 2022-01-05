@@ -28,7 +28,7 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
     private const NONCE = '12345678';
 
     /**
-     * @var OpenIdConfigurationProvider
+     * @var OpenIdConfigurationProvider|null
      */
     private $provider;
 
@@ -65,6 +65,40 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
             ], [
             'httpClient' => $mockHttpClient,
         ]);
+    }
+
+    public function testConstructCacheItemPool(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectDeprecationMessage('Required options not defined: cacheItemPool');
+
+        $provider = new OpenIdConfigurationProvider([], []);
+    }
+
+    public function testConstructOpenIDConnectMetadataUrl(): void
+    {
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectDeprecationMessage('Required options not defined: openIDConnectMetadataUrl');
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+        ], []);
+    }
+
+    public function testConstructLeeway(): void
+    {
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+
+        $this->expectException(NegativeLeewayException::class);
+        $this->expectExceptionMessage('Leeway has to be a positive integer');
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'leeway' => -10
+        ], []);
     }
 
     public function testGenerateState(): void
@@ -225,17 +259,6 @@ class OpenIdConfigurationProviderTest extends MockeryTestCase
         $this->expectExceptionMessage('ID token has incorrect nonce');
 
         $this->provider->validateIdToken('token', self::NONCE);
-    }
-
-    /**
-     * @runInSeparateProcess
-     */
-    public function testValidateIdTokenNegativeLeewayFailure(): void
-    {
-        $this->expectException(NegativeLeewayException::class);
-        $this->expectExceptionMessage('Leeway has to be a positive integer');
-
-        $this->provider->validateIdToken('token', self::NONCE, -1);
     }
 
     /**
