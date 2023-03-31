@@ -8,6 +8,7 @@ use Firebase\JWT\JWT;
 use GuzzleHttp\Exception\GuzzleException;
 use ItkDev\OpenIdConnect\Exception\CacheException;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
+use ItkDev\OpenIdConnect\Exception\CodeException;
 use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
@@ -38,6 +39,8 @@ use RobRichards\XMLSecLibs\XMLSecurityKey;
 class OpenIdConfigurationProvider extends AbstractProvider
 {
     private const CACHE_KEY_PREFIX = 'itk-openid-connect-configuration-';
+
+    // @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
     private const POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
     private const STATE = 'state';
 
@@ -204,6 +207,47 @@ class OpenIdConfigurationProvider extends AbstractProvider
             return $claims;
         } catch (\UnexpectedValueException $e) {
             throw new ValidationException('ID token validation failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get and validate id token from code.
+     *
+     * @param string $code
+     *   The code
+     *
+     * @param string $redirectUri
+     *   The redirect URI
+     *
+     * @param string $nonce
+     *   The nonce
+     *
+     * @see self::validateIdToken().
+     *
+     * @return object
+     *   The ID token as a PHP object
+     *
+     * @throws CodeException
+     */
+    public function getIdToken(string $code, string $redirectUri, string $nonce): object
+    {
+        try {
+            $endpoint = $this->getConfiguration('token_endpoint');
+            $response = $this->getHttpClient()->request('POST', $endpoint, [
+                'form_params' => [
+                    'client_id' => $this->clientId,
+                    'client_secret' => $this->clientSecret,
+                    'redirect_uri' => $redirectUri,
+                    'grant_type' => 'authorization_code',
+                    'code' => $code,
+                ]
+            ]);
+
+            $payload = json_decode((string)$response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+
+            return $this->validateIdToken($payload['id_token'], $nonce);
+        } catch (\Exception $e) {
+            throw new CodeException('Get ID token failed: ' . $e->getMessage(), 0, $e);
         }
     }
 
