@@ -42,6 +42,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
     // @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
     private const POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
+    private const ID_TOKEN_HINT = 'id_token_hint';
+
     private const STATE = 'state';
 
     protected string $openIDConnectMetadataUrl;
@@ -144,11 +146,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Get the end session endpoint from the metadata url
      *
      * @see https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-a-sign-out-request
+     * @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
      *
      * @param string|null $postLogoutRedirectUri
      *   The URL that the user should be redirected to after successful sign out.
      * @param string|null $state
      *   If a state parameter is included in the request, the same value should appear in the response. The application should verify that the state values in the request and response are identical.
+     * @param string|null $idToken
+     *   The id token.
      *
      * @return string
      *   The Url to redirect the client to for session logout
@@ -157,18 +162,26 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws HttpException
      * @throws JsonException
      */
-    public function getEndSessionUrl(string $postLogoutRedirectUri = null, string $state = null): string
+    public function getEndSessionUrl(string $postLogoutRedirectUri = null, string $state = null, string $idToken = null): string
     {
         $url = $this->getConfiguration('end_session_endpoint');
 
+        $params = [];
         if ($postLogoutRedirectUri) {
-            $glue = parse_url($url, PHP_URL_QUERY) === null ? '?' : '&';
-            $url .= $glue . $this->buildQueryString([self::POST_LOGOUT_REDIRECT_URI => $postLogoutRedirectUri]);
+            $params[self::POST_LOGOUT_REDIRECT_URI] = $postLogoutRedirectUri;
         }
 
         if ($state) {
+            $params[self::STATE] = $state;
+        }
+
+        if ($idToken) {
+            $params[self::ID_TOKEN_HINT] = $idToken;
+        }
+
+        if (!empty($params)) {
             $glue = parse_url($url, PHP_URL_QUERY) === null ? '?' : '&';
-            $url .= $glue . $this->buildQueryString([self::STATE => $state]);
+            $url .= $glue . $this->buildQueryString($params);
         }
 
         return $url;
@@ -211,7 +224,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Get and validate id token from code.
+     * Get id token from code.
      *
      * @param string $code
      *   The code
@@ -219,17 +232,12 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @param string $redirectUri
      *   The redirect URI
      *
-     * @param string $nonce
-     *   The nonce
-     *
-     * @see self::validateIdToken().
-     *
-     * @return object
-     *   The ID token as a PHP object
+     * @return string
+     *   The ID token.
      *
      * @throws CodeException
      */
-    public function getIdToken(string $code, string $redirectUri, string $nonce): object
+    public function getIdToken(string $code, string $redirectUri): string
     {
         try {
             $endpoint = $this->getConfiguration('token_endpoint');
@@ -245,7 +253,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
             $payload = json_decode((string)$response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
-            return $this->validateIdToken($payload['id_token'], $nonce);
+            return $payload['id_token'];
         } catch (\Exception $e) {
             throw new CodeException('Get ID token failed: ' . $e->getMessage(), 0, $e);
         }
@@ -539,10 +547,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
             throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: ' . $url);
-        }
-
-        if (parse_url($url, PHP_URL_SCHEME) !== 'https') {
-            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: ' . $url);
         }
 
         $this->openIDConnectMetadataUrl = $url;
