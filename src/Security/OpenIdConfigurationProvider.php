@@ -237,7 +237,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @throws CodeException
      */
-    public function getIdToken(string $code, string $redirectUri): string
+    public function getIdToken(string $code): string
     {
         try {
             $endpoint = $this->getConfiguration('token_endpoint');
@@ -245,7 +245,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 'form_params' => [
                     'client_id' => $this->clientId,
                     'client_secret' => $this->clientSecret,
-                    'redirect_uri' => $redirectUri,
+                    'redirect_uri' => $this->redirectUri,
                     'grant_type' => 'authorization_code',
                     'code' => $code,
                 ]
@@ -545,8 +545,15 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function setOpenIDConnectMetadataUrl(string $url): void
     {
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+
+        if (null === $scheme) {
             throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: ' . $url);
+        }
+
+        // @todo Add options to allow http.
+        if ('https' !== $scheme) {
+            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: ' . $url);
         }
 
         $this->openIDConnectMetadataUrl = $url;
