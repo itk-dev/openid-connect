@@ -140,7 +140,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetGuarded(): void
     {
         $guarded = $this->provider->getGuarded();
-        $expected = ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway'];
+        $expected = ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway', 'allowHttp'];
 
         $this->assertSame($expected, $guarded);
     }

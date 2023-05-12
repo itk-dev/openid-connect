@@ -56,6 +56,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
     private string $responseResourceOwnerId = 'id';
 
+    private bool $allowHttp = false;
+
     /**
      * OpenIdConfigurationProvider constructor.
      *
@@ -94,6 +96,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
         $this->setRequestFactory($collaborators['jwt']);
 
+        $this->setAllowHttp((bool)($options['allowHttp'] ?? false));
         $this->setOpenIDConnectMetadataUrl($options['openIDConnectMetadataUrl']);
     }
 
@@ -104,7 +107,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         // Prevent these option from being set by direct access by the
         // parent constructor.
-        return ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway'];
+        return ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway', 'allowHttp'];
     }
 
     /**
@@ -537,6 +540,19 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
+     * Set allow HTTP.
+     *
+     * @param bool $allowHttp
+     *   Whether to allow HTTP.
+     *
+     * @return void
+     */
+    private function setAllowHttp(bool $allowHttp): void
+    {
+        $this->allowHttp = $allowHttp;
+    }
+
+    /**
      * Set the OpenID Connect Metadata Url
      *
      * @param string $url
@@ -551,8 +567,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: ' . $url);
         }
 
-        // @todo Add options to allow http.
-        if ('https' !== $scheme) {
+        if (!$this->allowHttp && 'https' !== $scheme) {
             throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: ' . $url);
         }
 
