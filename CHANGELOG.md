@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2023-07-03
+
+### Added
+- Added support for [Authorization Code
+  Flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow)
+
 ## [3.0.1] - 2022-10-07
 ### Fixed
 - Add missing direct dependency on psr/http-client
@@ -27,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Function to get the logout / end session url from the config metadata
 
-### Changed 
+### Changed
 - Updated CHANGELOG
 - Added badges to Readme
 
@@ -42,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - 2021-06-04
 ### Security
 - Fixed security issue, where token was not validated against the signing keys
-- 
+-
 ### Added
 - Test suite
 - Psalm setup for static analysis
@@ -55,8 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - README
 - LICENSE
-- OpenId-Connect: Added OpenIdConfigurationProvider  
-- PHP-CS-Fixer  
+- OpenId-Connect: Added OpenIdConfigurationProvider
+- PHP-CS-Fixer
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
