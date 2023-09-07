@@ -227,8 +227,6 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $this->assertEquals(self::NONCE, $claims->nonce);
         $this->assertEquals(self::CLIENT_ID, $claims->aud);
-
-        $d=1;
     }
 
 
