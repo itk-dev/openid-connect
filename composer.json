@@ -42,7 +42,7 @@
         "dealerdirect/phpcodesniffer-composer-installer": "^0.7.1",
         "escapestudios/symfony2-coding-standard": "^3.12",
         "mockery/mockery": "^1.4",
-        "vimeo/psalm": "^4.7",
+        "vimeo/psalm": "^5.0",
         "phpunit/php-code-coverage": "^9.2"
     },
     "scripts": {
