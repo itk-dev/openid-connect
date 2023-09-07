@@ -23,7 +23,7 @@
         "ext-openssl": "*",
         "league/oauth2-client": "^2.6",
         "firebase/php-jwt": "^6.8",
-        "psr/cache": "^1.0 || ^2.0 || ^3.0",
+        "psr/cache": "^2.0 || ^3.0",
         "robrichards/xmlseclibs": "^3.1",
         "psr/http-client": "^1.0"
     },
