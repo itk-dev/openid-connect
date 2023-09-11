@@ -6,8 +6,8 @@ services:
   phpfpm:
     image: itkdev/php8.1-fpm:latest
     environment:
-      - XDEBUG_MODE=${XDEBUG_MODE:-off}
-      - XDEBUG_SESSION=${XDEBUG_SESSION:-0}
+      - PHP_XDEBUG_MODE=${PHP_XDEBUG_MODE:-off}
+      - PHP_MAX_EXECUTION_TIME=30
       - COMPOSER_VERSION=2
       - DOCKER_HOST_DOMAIN=${COMPOSE_DOMAIN}
       - PHP_IDE_CONFIG=serverName=localhost
