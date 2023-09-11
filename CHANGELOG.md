@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2023-09-11
+ - Updated `firebase/php-jwt` to 6.8
+ - Updated `vimeo/psalm` to 5.x
+ - Add PHP 8.2 to list of tested versions
+ - Update to latest github actions
+ - Add changelog check to github actions
+ - Minor fixes and cleanup
+
 ## [3.1.0] - 2023-07-03
 
 ### Added
@@ -15,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.1] - 2022-10-07
 ### Fixed
-- Add missing direct dependency on psr/http-client
+- Add missing direct dependency on `psr/http-client`
 
 ## [3.0.0] - 2021-12-08
 ### Changed
