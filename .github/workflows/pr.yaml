@@ -128,3 +128,19 @@ jobs:
 
       - name: Psalm
         uses: docker://vimeo/psalm-github-actions
+
+  changelog:
+    runs-on: ubuntu-latest
+    name: Changelog should be updated
+    strategy:
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+
+      - name: Git fetch
+        run: git fetch
+
+      - name: Check that changelog has been updated.
+        run: git diff --exit-code origin/${{ github.base_ref }} -- CHANGELOG.md && exit 1 || exit 0

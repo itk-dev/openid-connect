@@ -7,15 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.1.0] - 2023-07-03
+## [3.2.0] - 2023-09-11
+### Changed
+ - Updated `firebase/php-jwt` to 6.8
+ - Updated `vimeo/psalm` to 5.x
+ - Update to latest github actions
 
+### Added
+ - Add PHP 8.2 to list of tested versions
+ - Add changelog check to github actions
+
+## [3.1.0] - 2023-07-03
 ### Added
 - Added support for [Authorization Code
   Flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow)
 
 ## [3.0.1] - 2022-10-07
 ### Fixed
-- Add missing direct dependency on psr/http-client
+- Add missing direct dependency on `psr/http-client`
 
 ## [3.0.0] - 2021-12-08
 ### Changed
@@ -66,7 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[unreleased]: https://github.com/itk-dev/openid-connect/compare/2.2.0...HEAD
+[unreleased]: https://github.com/itk-dev/openid-connect/compare/3.2.0...HEAD
+[3.1.0]: https://github.com/itk-dev/openid-connect/compare/3.1.0...3.2.0
+[3.0.0]: https://github.com/itk-dev/openid-connect/compare/3.0.0...3.1.0
+[2.2.0]: https://github.com/itk-dev/openid-connect/compare/2.2.0...2.3.0
 [2.1.0]: https://github.com/itk-dev/openid-connect/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/itk-dev/openid-connect/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/itk-dev/openid-connect/compare/1.0.0...2.0.0
