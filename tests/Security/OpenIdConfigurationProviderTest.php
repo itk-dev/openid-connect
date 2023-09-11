@@ -71,7 +71,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testConstructCacheItemPool(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectDeprecationMessage('Required options not defined: cacheItemPool');
+        $this->expectExceptionMessage('Required options not defined: cacheItemPool');
 
         $provider = new OpenIdConfigurationProvider([], []);
     }
@@ -81,7 +81,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectDeprecationMessage('Required options not defined: openIDConnectMetadataUrl');
+        $this->expectExceptionMessage('Required options not defined: openIDConnectMetadataUrl');
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
@@ -223,7 +223,10 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
-        $this->provider->validateIdToken('token', self::NONCE);
+        $claims = $this->provider->validateIdToken('token', self::NONCE);
+
+        $this->assertEquals(self::NONCE, $claims->nonce);
+        $this->assertEquals(self::CLIENT_ID, $claims->aud);
     }
 
 

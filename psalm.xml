@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <psalm
     errorLevel="3"
-    resolveFromConfigFile="true"
+    findUnusedBaselineEntry="true"
+    findUnusedCode="true"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns="https://getpsalm.org/schema/config"
     xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
@@ -19,5 +20,10 @@
                 <file name="src/Security/OpenIdConfigurationProvider.php"/>
             </errorLevel>
         </PropertyNotSetInConstructor>
+        <UnusedClass>
+            <errorLevel type="suppress">
+                <referencedClass name="ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider"/>
+            </errorLevel>
+        </UnusedClass>
     </issueHandlers>
 </psalm>

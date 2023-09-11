@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace ItkDev\OpenIdConnect\Security;
 
 use Firebase\JWT\JWT;
-use GuzzleHttp\Exception\GuzzleException;
 use ItkDev\OpenIdConnect\Exception\CacheException;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\CodeException;
@@ -28,6 +27,7 @@ use League\OAuth2\Client\Token\AccessToken;
 use League\OAuth2\Client\Tool\RequestFactory;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Cache\InvalidArgumentException;
+use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Message\ResponseInterface;
 use RobRichards\XMLSecLibs\XMLSecurityKey;
 
@@ -209,7 +209,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
         try {
             $keys = $this->getJwtVerificationKeys();
             JWT::$leeway = $this->leeway;
-            $claims = JWT::decode($idToken, $keys, ['RS256']);
+            $claims = JWT::decode($idToken, $keys);
             if ($claims->aud !== $this->clientId) {
                 throw new ClaimsException('ID token has incorrect audience: ' . $claims->aud);
             }
@@ -232,13 +232,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @param string $code
      *   The code
      *
-     * @param string $redirectUri
-     *   The redirect URI
-     *
      * @return string
      *   The ID token.
      *
      * @throws CodeException
+     * @throws ClientExceptionInterface
      */
     public function getIdToken(string $code): string
     {
@@ -436,7 +434,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $resource = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
 
             return $resource;
-        } catch (GuzzleException $e) {
+        } catch (ClientExceptionInterface $e) {
             throw new HttpException($e->getMessage());
         } catch (\JsonException $e) {
             throw new JsonException($e->getMessage());
