@@ -2,8 +2,10 @@
 
 namespace Tests\Security;
 
+use Firebase\JWT\Key;
 use Firebase\JWT\SignatureInvalidException;
 use GuzzleHttp\ClientInterface;
+use Hamcrest\Matchers as m;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
@@ -221,7 +223,16 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
 
-        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+        // Assert that 'decode' is called as decode(<string>, [<string>, <Firebase\JWT\Key>])
+        // @see https://github.com/firebase/php-jwt/issues/432
+        $mockJWT->shouldReceive('decode')
+            ->with(
+                \Mockery::type('string'),
+                m::hasKeyValuePair(
+                    '111111111111111111111111111111111111111111',
+                    m::anInstanceOf(Key::class)
+                )
+            )->andReturn($mockClaims);
 
         $claims = $this->provider->validateIdToken('token', self::NONCE);
 
