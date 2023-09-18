@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ItkDev\OpenIdConnect\Security;
 
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use ItkDev\OpenIdConnect\Exception\CacheException;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\CodeException;
@@ -373,7 +374,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
                     if ($key['kty'] === 'RSA') {
                         $e = self::base64urlDecode($key['e']);
                         $n = self::base64urlDecode($key['n']);
-                        $keys[$kid] = XMLSecurityKey::convertRSA($n, $e);
+                        $publicKey = XMLSecurityKey::convertRSA($n, $e);
+                        $keys[$kid] = new Key($publicKey, 'RS256');
                     } else {
                         throw new KeyException('Unsupported key data for key id: ' . $kid);
                     }
