@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2023-09-18
+### Fixed
+ - Fixed "Return value of JWT::getKey() must be an instance of Firebase\JWT\Key" error
+
 ## [3.2.0] - 2023-09-11
 ### Changed
  - Updated `firebase/php-jwt` to 6.8
