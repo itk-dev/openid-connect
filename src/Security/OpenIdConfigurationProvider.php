@@ -35,21 +35,23 @@ use RobRichards\XMLSecLibs\XMLSecurityKey;
 /**
  * Class OpenIdConfigurationProvider.
  *
- * @see https://github.com/cirrusidentity/simplesamlphp-module-authoauth2/blob/master/lib/Providers/OpenIDConnectProvider.php
+ * @see https://github.com/cirrusidentity/simplesamlphp-module-authoauth2/blob/master/src/Providers/OpenIDConnectProvider.php
  */
 class OpenIdConfigurationProvider extends AbstractProvider
 {
-    private const CACHE_KEY_PREFIX = 'itk-openid-connect-configuration-';
+    private const string CACHE_KEY_PREFIX = 'itk-openid-connect-configuration-';
 
     // @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
-    private const POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
-    private const ID_TOKEN_HINT = 'id_token_hint';
+    private const string POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
+    private const string ID_TOKEN_HINT = 'id_token_hint';
 
-    private const STATE = 'state';
+    private const string STATE = 'state';
+
+    private string $responseError = 'error';
 
     protected string $openIDConnectMetadataUrl;
 
-    private ?CacheItemPoolInterface $cacheItemPool;
+    private ?CacheItemPoolInterface $cacheItemPool = null;
 
     private int $cacheDuration = 86400;
 
@@ -350,8 +352,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *   Array of keys
      *
      * @throws ItkOpenIdConnectException
-     *
-     * @psalm-suppress InvalidCatch
      */
     private function getJwtVerificationKeys(): array
     {
@@ -404,6 +404,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         $decoded = base64_decode(strtr($input, '-_', '+/'));
 
+        /* @phpstan-ignore identical.alwaysFalse */
         if ($decoded === false) {
             throw new DecodeException('Error url decoding input ' . $input);
         }
@@ -455,8 +456,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
-     *
-     * @psalm-suppress InvalidCatch
      */
     private function getConfiguration(string $key): string
     {

@@ -28,7 +28,7 @@ If you are looking to use this in a Symfony or Drupal project you should use
 either:
 
 * Symfony: [itk-dev/openid-connect-bundle](https://github.com/itk-dev/openid-connect-bundle)
-* Drupal: [itk-dev/itkdev_openid_connect_drupal](https://github.com/itk-dev/itkdev_openid_connect_drupal)
+* (Archived) ~~Drupal: [itk-dev/itkdev_openid_connect_drupal](https://github.com/itk-dev/itkdev_openid_connect_drupal)~~
 
 ### Direct Installation
 
@@ -192,14 +192,14 @@ The test suite uses [Mockery](https://github.com/mockery/mockery) in order mock
 [public static methods](http://docs.mockery.io/en/latest/reference/public_static_properties.html?highlight=static)
 in 3rd party libraries like the `JWT::decode` method from `firebase/jwt`.
 
-### Psalm static analysis
+### PHPStan static analysis
 
-Where using [Psalm](https://psalm.dev/) for static analysis. To run
-psalm do
+Where using [PHPStan](https://phpstan.org/) for static analysis. To run
+phpstan do
 
 ```shell
 docker compose exec phpfpm composer install
-docker compose exec phpfpm ./vendor/bin/psalm
+docker compose exec phpfpm ./vendor/bin/phpstan
 ```
 
 ### Check Coding Standard
