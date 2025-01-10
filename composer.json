@@ -46,7 +46,7 @@
         "phpstan/phpstan": "^2.1"
     },
     "scripts": {
-        "test": "XDEBUG_MODE=coverage ./vendor/bin/phpunit --display-deprecations",
+        "test": "XDEBUG_MODE=coverage ./vendor/bin/phpunit",
         "apply-coding-standards": [
             "phpcbf --standard=phpcs.xml.dist"
         ],
