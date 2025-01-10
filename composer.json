@@ -18,7 +18,7 @@
         }
     ],
     "require": {
-        "php": "^8.1",
+        "php": "^8.3",
         "ext-json": "*",
         "ext-openssl": "*",
         "league/oauth2-client": "^2.6",
