@@ -66,6 +66,10 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
           restore-keys: ${{ runner.os }}-${{ matrix.php }}-composer-${{ matrix.prefer }}-
 
+      - name: Install dependencies
+        run: |
+          composer update --${{ matrix.prefer }} --prefer-dist --no-interaction
+
       - name: Unit tests
         run: ./vendor/bin/phpunit --coverage-clover=coverage/unit.xml
 
@@ -149,16 +153,6 @@ jobs:
 
       - name: Run PHPStan
         run: ./vendor/bin/phpstan
-
-  psalm:
-    name: Psalm
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Psalm
-        uses: docker://vimeo/psalm-github-actions
 
   changelog:
     runs-on: ubuntu-latest
