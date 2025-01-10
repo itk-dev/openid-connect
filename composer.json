@@ -38,15 +38,15 @@
         }
     },
     "require-dev": {
-        "phpunit/phpunit": "^9.5",
-        "dealerdirect/phpcodesniffer-composer-installer": "^0.7.1",
+        "phpunit/phpunit": "^10.0",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "escapestudios/symfony2-coding-standard": "^3.12",
         "mockery/mockery": "^1.4",
         "vimeo/psalm": "^5.0",
-        "phpunit/php-code-coverage": "^9.2"
+        "phpunit/php-code-coverage": "^10.0"
     },
     "scripts": {
-        "test": "./vendor/bin/phpunit",
+        "test": "XDEBUG_MODE=coverage ./vendor/bin/phpunit --display-deprecations",
         "apply-coding-standards": [
             "phpcbf --standard=phpcs.xml.dist"
         ],
