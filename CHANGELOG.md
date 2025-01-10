@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Removed support for PHP 8.1 and 8.2
  - Changed from Psalm to PHPStan
  - Upgrade to PHPUnit 11
- - 
 
 ## [3.2.1] - 2023-09-18
 ### Fixed
