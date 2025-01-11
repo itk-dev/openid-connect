@@ -402,9 +402,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private static function base64urlDecode(string $input): string
     {
-        $decoded = base64_decode(strtr($input, '-_', '+/'));
+        $decoded = base64_decode(strtr($input, '-_', '+/'), true);
 
-        /* @phpstan-ignore identical.alwaysFalse */
         if ($decoded === false) {
             throw new DecodeException('Error url decoding input ' . $input);
         }
