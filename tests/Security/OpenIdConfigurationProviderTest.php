@@ -13,6 +13,7 @@ use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use PHPUnit\Framework\MockObject\Exception;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -28,10 +29,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     private const REDIRECT_URI = 'https://redirect.url';
     private const NONCE = '12345678';
 
-    /**
-     * @var OpenIdConfigurationProvider|null
-     */
-    private $provider;
+    private ?OpenIdConfigurationProvider $provider;
 
     public function setUp(): void
     {
@@ -305,6 +303,8 @@ class OpenIdConfigurationProviderTest extends TestCase
      *
      * @return ResponseInterface
      *   A success ("200") response with mock body data
+     *
+     * @throws Exception
      */
     private function getMockHttpSuccessResponse(string $mockResponseDataPath): ResponseInterface
     {

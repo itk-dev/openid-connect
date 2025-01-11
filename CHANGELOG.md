@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2025-01-11
+ - Removed support for PHP 8.1 and 8.2 (BC)
+ - Changed from Psalm to PHPStan
+ - Upgrade to PHPUnit 11
+ - Add Github action to auto create releases
+
+## [3.2.1] - 2023-09-18
+### Fixed
+ - Fixed "Return value of JWT::getKey() must be an instance of Firebase\JWT\Key" error
+
 ## [3.2.0] - 2023-09-11
 ### Changed
  - Updated `firebase/php-jwt` to 6.8
