@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
- - Removed support for PHP 8.1 and 8.2
+
+## [4.0.0] - 2025-01-11
+ - Removed support for PHP 8.1 and 8.2 (BC)
  - Changed from Psalm to PHPStan
  - Upgrade to PHPUnit 11
  - Add Github action to auto create releases
