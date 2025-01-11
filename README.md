@@ -3,7 +3,7 @@
 [![Github](https://img.shields.io/badge/source-itk--dev/openid--connect-blue?style=flat-square)](https://github.com/itk-dev/openid-connect)
 [![Release](https://img.shields.io/packagist/v/itk-dev/openid-connect.svg?style=flat-square&label=release)](https://packagist.org/packages/itk-dev/openid-connect)
 [![PHP Version](https://img.shields.io/packagist/php-v/itk-dev/openid-connect.svg?style=flat-square&colorB=%238892BF)](https://www.php.net/downloads)
-[![Build Status](https://img.shields.io/github/workflow/status/itk-dev/openid-connect/Test%20%26%20Code%20Style%20Review?label=CI&logo=github&style=flat-square)](https://github.com/itk-dev/openid-connect/actions?query=workflow%3A%22Test+%26+Code+Style+Review%22)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/itk-dev/openid-connect/pr.yaml?label=CI&logo=github&style=flat-square)](https://github.com/itk-dev/openid-connect/actions?query=workflow%3A%22Test+%26+Code+Style+Review%22)
 [![Codecov Code Coverage](https://img.shields.io/codecov/c/gh/itk-dev/openid-connect?label=codecov&logo=codecov&style=flat-square)](https://codecov.io/gh/itk-dev/openid-connect)
 [![Read License](https://img.shields.io/packagist/l/itk-dev/openid-connect.svg?style=flat-square&colorB=darkcyan)](https://github.com/itk-dev/openid-connect/blob/master/LICENSE.md)
 [![Package downloads on Packagist](https://img.shields.io/packagist/dt/itk-dev/openid-connect.svg?style=flat-square&colorB=darkmagenta)](https://packagist.org/packages/itk-dev/openid-connect/stats)
@@ -28,7 +28,7 @@ If you are looking to use this in a Symfony or Drupal project you should use
 either:
 
 * Symfony: [itk-dev/openid-connect-bundle](https://github.com/itk-dev/openid-connect-bundle)
-* Drupal: [itk-dev/itkdev_openid_connect_drupal](https://github.com/itk-dev/itkdev_openid_connect_drupal)
+* (Archived) ~~Drupal: [itk-dev/itkdev_openid_connect_drupal](https://github.com/itk-dev/itkdev_openid_connect_drupal)~~
 
 ### Direct Installation
 
@@ -192,14 +192,14 @@ The test suite uses [Mockery](https://github.com/mockery/mockery) in order mock
 [public static methods](http://docs.mockery.io/en/latest/reference/public_static_properties.html?highlight=static)
 in 3rd party libraries like the `JWT::decode` method from `firebase/jwt`.
 
-### Psalm static analysis
+### PHPStan static analysis
 
-Where using [Psalm](https://psalm.dev/) for static analysis. To run
-psalm do
+Where using [PHPStan](https://phpstan.org/) for static analysis. To run
+phpstan do
 
 ```shell
 docker compose exec phpfpm composer install
-docker compose exec phpfpm ./vendor/bin/psalm
+docker compose exec phpfpm ./vendor/bin/phpstan
 ```
 
 ### Check Coding Standard
