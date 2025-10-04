@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Handled an array of audiences on ID token.
+
 ## [4.0.1] - 2025-01-13
- - Fix create release action 
+ - Fix create release action
 
 ## [4.0.0] - 2025-01-11
  - Removed support for PHP 8.1 and 8.2 (BC)
