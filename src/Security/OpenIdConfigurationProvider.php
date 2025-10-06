@@ -213,8 +213,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $keys = $this->getJwtVerificationKeys();
             JWT::$leeway = $this->leeway;
             $claims = JWT::decode($idToken, $keys);
-            if ($claims->aud !== $this->clientId) {
-                throw new ClaimsException('ID token has incorrect audience: ' . $claims->aud);
+            // "aud" may be an array of strings or a single string
+            // (cf. https://openid.net/specs/openid-connect-core-1_0.html#IDToken).
+            $audiences = (array) $claims->aud;
+            if (!in_array($this->clientId, $audiences)) {
+                throw new ClaimsException('ID token has incorrect audience(s): ' . implode(', ', $audiences));
             }
             if ($claims->iss !== $this->getConfiguration('issuer')) {
                 throw new ClaimsException('ID token has incorrect issuer: ' . $claims->iss);
