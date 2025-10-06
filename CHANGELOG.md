@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.2] - 2025-10-06
 - Handled an array of audiences on ID token.
 
 ## [4.0.1] - 2025-01-13
@@ -90,11 +91,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[unreleased]: https://github.com/itk-dev/openid-connect/compare/3.2.0...HEAD
-[3.1.0]: https://github.com/itk-dev/openid-connect/compare/3.1.0...3.2.0
-[3.0.0]: https://github.com/itk-dev/openid-connect/compare/3.0.0...3.1.0
-[2.2.0]: https://github.com/itk-dev/openid-connect/compare/2.2.0...2.3.0
-[2.1.0]: https://github.com/itk-dev/openid-connect/compare/2.1.0...2.2.0
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.0.2...HEAD
+[4.0.2]: https://github.com/itk-dev/openid-connect/compare/4.0.1...4.0.2
+[4.0.1]: https://github.com/itk-dev/openid-connect/compare/4.0.0...4.0.1
+[4.0.0]: https://github.com/itk-dev/openid-connect/compare/3.2.1...4.0.0
+[3.2.1]: https://github.com/itk-dev/openid-connect/compare/3.2.0...3.2.1
+[3.2.0]: https://github.com/itk-dev/openid-connect/compare/3.1.0...3.2.0
+[3.1.0]: https://github.com/itk-dev/openid-connect/compare/3.0.0...3.1.0
+[3.0.0]: https://github.com/itk-dev/openid-connect/compare/2.3.0...3.0.0
+[2.3.0]: https://github.com/itk-dev/openid-connect/compare/2.2.0...2.3.0
+[2.2.0]: https://github.com/itk-dev/openid-connect/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/itk-dev/openid-connect/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/itk-dev/openid-connect/compare/1.0.0...2.0.0
 [1.0.0]: https://github.com/itk-dev/openid-connect/releases/tag/1.0.0
