@@ -194,7 +194,15 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Do any required verification of the id token and return an array of decoded claims
+     * Do any required verification of the id token and return an array of decoded claims.
+     *
+     * Note: The "exp" (expiration) claim is validated by firebase/php-jwt during
+     * JWT::decode(), using the configured leeway for clock skew tolerance.
+     *
+     * Note: JWT::$leeway is a static property, so in environments with multiple
+     * OpenIdConfigurationProvider instances (e.g. multi-tenant setups in long-running
+     * processes), the leeway value set by the last provider to call validateIdToken()
+     * will apply globally until overwritten.
      *
      * @param string $idToken
      *   Raw id token
@@ -211,6 +219,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         try {
             $keys = $this->getJwtVerificationKeys();
+            // NB: JWT::$leeway is a static property shared across all instances.
+            // Always set it immediately before decode to ensure the correct value.
             JWT::$leeway = $this->leeway;
             $claims = JWT::decode($idToken, $keys);
             // "aud" may be an array of strings or a single string
@@ -386,6 +396,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
                 $item->set($keys);
                 $item->expiresAfter($this->cacheDuration);
+                $this->cacheItemPool->save($item);
             }
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage());
