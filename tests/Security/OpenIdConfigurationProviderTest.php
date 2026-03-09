@@ -13,7 +13,6 @@ use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
-use PHPUnit\Framework\MockObject\Exception;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -46,13 +45,13 @@ class OpenIdConfigurationProviderTest extends TestCase
             ['GET', $jwks_uri, [], $mockKeysResponse],
         ];
 
-        $mockHttpClient = $this->createMock(ClientInterface::class);
-        $mockHttpClient->method('request')->will($this->returnValueMap($requestMap));
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturnMap($requestMap);
 
-        $mockCacheItem = $this->createMock(CacheItemInterface::class);
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
         $mockCacheItem->method('isHit')->willReturn(false);
 
-        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
         $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
 
         $this->provider = new OpenIdConfigurationProvider([
@@ -78,7 +77,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testConstructOpenIDConnectMetadataUrl(): void
     {
-        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Required options not defined: openIDConnectMetadataUrl');
@@ -90,7 +89,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testConstructCacheDuration(): void
     {
-        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
 
         $this->expectException(NegativeCacheDurationException::class);
         $this->expectExceptionMessage('Cache Duration has to be a positive integer');
@@ -104,7 +103,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testConstructLeeway(): void
     {
-        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
 
         $this->expectException(NegativeLeewayException::class);
         $this->expectExceptionMessage('Leeway has to be a positive integer');
@@ -304,16 +303,15 @@ class OpenIdConfigurationProviderTest extends TestCase
      * @return ResponseInterface
      *   A success ("200") response with mock body data
      *
-     * @throws Exception
      */
     private function getMockHttpSuccessResponse(string $mockResponseDataPath): ResponseInterface
     {
         $mockResponseData = file_get_contents(__DIR__ . $mockResponseDataPath);
 
-        $mockStream = $this->createMock(StreamInterface::class);
+        $mockStream = $this->createStub(StreamInterface::class);
         $mockStream->method('getContents')->willReturn($mockResponseData);
 
-        $mockResponse = $this->createMock(ResponseInterface::class);
+        $mockResponse = $this->createStub(ResponseInterface::class);
         $mockResponse->method('getStatusCode')->willReturn(200);
         $mockResponse->method('getBody')->willReturn($mockStream);
 
