@@ -3,6 +3,7 @@
 services:
   phpfpm:
     image: itkdev/php8.3-fpm:latest
+    user: ${COMPOSE_USER:-deploy}
     environment:
       - PHP_XDEBUG_MODE=${PHP_XDEBUG_MODE:-off}
       - PHP_MAX_EXECUTION_TIME=30
