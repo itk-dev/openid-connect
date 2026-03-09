@@ -1,0 +1,38 @@
+name: PHPUnit
+
+env:
+  COMPOSE_USER: runner
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  unit-tests:
+    name: PHPUnit (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [phpfpm, phpfpm84, phpfpm85]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Create docker network
+        run: |
+          docker network create frontend
+
+      - run: |
+          docker compose run --rm ${{ matrix.service }} composer install
+          docker compose run --rm -e XDEBUG_MODE=coverage ${{ matrix.service }} vendor/bin/phpunit --coverage-clover=coverage/unit.xml
+
+      - name: Report coverage to Codecov
+        if: matrix.service == 'phpfpm'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/unit.xml
+          flags: unit

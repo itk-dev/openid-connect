@@ -1,0 +1,26 @@
+name: PHPStan
+
+env:
+  COMPOSE_USER: runner
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  phpstan:
+    name: PHPStan - Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Create docker network
+        run: |
+          docker network create frontend
+
+      - run: |
+          docker compose run --rm phpfpm composer install
+          docker compose run --rm phpfpm vendor/bin/phpstan

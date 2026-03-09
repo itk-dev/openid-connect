@@ -168,7 +168,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws HttpException
      * @throws JsonException
      */
-    public function getEndSessionUrl(string $postLogoutRedirectUri = null, string $state = null, string $idToken = null): string
+    public function getEndSessionUrl(?string $postLogoutRedirectUri = null, ?string $state = null, ?string $idToken = null): string
     {
         $url = $this->getConfiguration('end_session_endpoint');
 
