@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Achieved 100% test coverage (methods and lines)
+- Fixed JWKS verification keys not being persisted to cache
+- Documented JWT::$leeway static property limitation and exp claim validation
+
 ## [4.0.3] - 2026-03-09
 - Upgraded PHPUnit from 11 to 12, Updated `phpunit.xml.dist` schema to 12.5
 - Upgraded `firebase/php-jwt` to 7.* to fix security vulnerability.

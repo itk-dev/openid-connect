@@ -622,7 +622,9 @@ class OpenIdConfigurationProviderTest extends TestCase
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
-        $exception = new class ('Connection refused') extends \RuntimeException implements ClientExceptionInterface {};
+        $exception = new class ('Connection refused') extends \RuntimeException implements ClientExceptionInterface
+        {
+        };
         $mockHttpClient->method('request')->willThrowException($exception);
 
         $mockCacheItem = $this->createStub(CacheItemInterface::class);
@@ -778,7 +780,9 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
-        $exception = new class ('Invalid cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException {};
+        $exception = new class ('Invalid cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException
+        {
+        };
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
         $mockCacheItemPool->method('getItem')->willThrowException($exception);
 
@@ -812,7 +816,9 @@ class OpenIdConfigurationProviderTest extends TestCase
         $configCacheItem->method('isHit')->willReturn(true);
         $configCacheItem->method('get')->willReturn($configuration);
 
-        $exception = new class ('Invalid jwks cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException {};
+        $exception = new class ('Invalid jwks cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException
+        {
+        };
 
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
         $mockCacheItemPool->method('getItem')->willReturnCallback(function (string $key) use ($configCacheItem, $exception) {
