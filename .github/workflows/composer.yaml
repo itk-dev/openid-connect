@@ -1,8 +1,5 @@
 name: Composer
 
-env:
-  COMPOSE_USER: runner
-
 on:
   pull_request:
   push:
@@ -12,18 +9,18 @@ on:
 
 jobs:
   composer-validate:
+    name: Validate composer (${{ matrix.prefer }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      matrix:
+        prefer: [prefer-lowest, prefer-stable]
     steps:
       - uses: actions/checkout@v5
 
-      - name: Create docker network
-        run: |
-          docker network create frontend
-
       - run: |
-          docker compose run --rm phpfpm composer validate --strict
+          docker compose run --rm --user "$(id -u):$(id -g)" phpfpm composer validate --strict
+          docker compose run --rm --user "$(id -u):$(id -g)" phpfpm composer update --${{ matrix.prefer }}
 
   composer-audit:
     runs-on: ubuntu-latest
@@ -31,10 +28,6 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v5
-
-      - name: Create docker network
-        run: |
-          docker network create frontend
 
       - run: |
           docker compose run --rm phpfpm composer audit
