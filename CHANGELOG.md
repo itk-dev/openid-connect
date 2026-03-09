@@ -95,7 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.0.2...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.0.3...HEAD
+[4.0.3]: https://github.com/itk-dev/openid-connect/compare/4.0.2...4.0.3
 [4.0.2]: https://github.com/itk-dev/openid-connect/compare/4.0.1...4.0.2
 [4.0.1]: https://github.com/itk-dev/openid-connect/compare/4.0.0...4.0.1
 [4.0.0]: https://github.com/itk-dev/openid-connect/compare/3.2.1...4.0.0
