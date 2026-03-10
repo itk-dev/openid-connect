@@ -3,9 +3,9 @@
 
 # https://prettier.io/docs/configuration
 overrides:
-  # Symfony config
-  - files:
-      - "config/**/*.{yml,yaml}"
-    options:
-      tabWidth: 4
-      singleQuote: true
+    # Symfony config
+    - files:
+          - "config/**/*.{yml,yaml}"
+      options:
+          tabWidth: 4
+          singleQuote: true

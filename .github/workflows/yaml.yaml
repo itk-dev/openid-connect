@@ -21,21 +21,21 @@
 name: YAML
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - develop
+    pull_request:
+    push:
+        branches:
+            - main
+            - develop
 
 jobs:
-  yaml-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
+    yaml-lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
 
-      - name: Create docker network
-        run: |
-          docker network create frontend
+            - name: Create docker network
+              run: |
+                  docker network create frontend
 
-      - run: |
-          docker compose run --rm prettier '**/*.{yml,yaml}' --check
+            - run: |
+                  docker compose run --rm prettier '**/*.{yml,yaml}' --check

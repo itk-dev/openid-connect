@@ -216,8 +216,13 @@ the coding standard for the project.
 * Markdown files (markdownlint standard rules)
 
     ```shell
-    docker run -v ${PWD}:/app itkdev/yarn:latest install
-    docker run -v ${PWD}:/app itkdev/yarn:latest check-coding-standards
+    docker compose run --rm markdownlint markdownlint '**/*.md'
+    ```
+
+* Yaml files
+
+    ```shell
+    docker compose run --rm prettier '**/*.{yml,yaml}' --check
     ```
 
 ### Apply Coding Standards
@@ -233,10 +238,15 @@ To attempt to automatically fix coding style
 * Markdown files (markdownlint standard rules)
 
     ```shell
-    docker run -v ${PWD}:/app itkdev/yarn:latest install
-    docker run -v ${PWD}:/app itkdev/yarn:latest check-coding-standards
+    docker compose run --rm markdownlint markdownlint '**/*.md' --fix
     ```
 
+* Yaml files
+
+    ```shell
+    docker compose run --rm prettier '**/*.{yml,yaml}' --write
+    ```
+  
 ## CI
 
 Github Actions are used to run the test suite and code style checks on all PR's.

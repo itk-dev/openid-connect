@@ -26,55 +26,55 @@
 name: Composer
 
 env:
-  COMPOSE_USER: runner
+    COMPOSE_USER: runner
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - develop
+    pull_request:
+    push:
+        branches:
+            - main
+            - develop
 
 jobs:
-  composer-validate:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v5
+    composer-validate:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+        steps:
+            - uses: actions/checkout@v5
 
-      - name: Create docker network
-        run: |
-          docker network create frontend
+            - name: Create docker network
+              run: |
+                  docker network create frontend
 
-      - run: |
-          docker compose run --rm phpfpm composer validate --strict
+            - run: |
+                  docker compose run --rm phpfpm composer validate --strict
 
-  composer-normalized:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v5
+    composer-normalized:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+        steps:
+            - uses: actions/checkout@v5
 
-      - name: Create docker network
-        run: |
-          docker network create frontend
+            - name: Create docker network
+              run: |
+                  docker network create frontend
 
-      - run: |
-          docker compose run --rm phpfpm composer install
-          docker compose run --rm phpfpm composer normalize --dry-run
+            - run: |
+                  docker compose run --rm phpfpm composer install
+                  docker compose run --rm phpfpm composer normalize --dry-run
 
-  composer-audit:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v5
+    composer-audit:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+        steps:
+            - uses: actions/checkout@v5
 
-      - name: Create docker network
-        run: |
-          docker network create frontend
+            - name: Create docker network
+              run: |
+                  docker network create frontend
 
-      - run: |
-          docker compose run --rm phpfpm composer audit
+            - run: |
+                  docker compose run --rm phpfpm composer audit

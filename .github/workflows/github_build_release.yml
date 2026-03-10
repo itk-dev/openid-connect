@@ -1,25 +1,25 @@
 on:
-  push:
-    tags:
-      - '*.*.*'
+    push:
+        tags:
+            - "*.*.*"
 
 name: Create Github Release
 
 permissions:
-  contents: write
+    contents: write
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    env:
-      COMPOSER_ALLOW_SUPERUSER: 1
-      APP_ENV: prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Create a release in GitHub
-        run: gh release create ${{ github.ref_name }} --verify-tag --generate-notes
+    create-release:
+        runs-on: ubuntu-latest
         env:
-          GITHUB_TOKEN: ${{ github.TOKEN }}
-        shell: bash
+            COMPOSER_ALLOW_SUPERUSER: 1
+            APP_ENV: prod
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+
+            - name: Create a release in GitHub
+              run: gh release create ${{ github.ref_name }} --verify-tag --generate-notes
+              env:
+                  GITHUB_TOKEN: ${{ github.TOKEN }}
+              shell: bash
