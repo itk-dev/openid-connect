@@ -43,7 +43,8 @@
         "escapestudios/symfony2-coding-standard": "^3.18",
         "mockery/mockery": "^1.6.12",
         "phpunit/php-code-coverage": "^12",
-        "phpstan/phpstan": "^2.1.40"
+        "phpstan/phpstan": "^2.1.40",
+        "ergebnis/composer-normalize": "^2.50"
     },
     "scripts": {
         "test": "XDEBUG_MODE=coverage ./vendor/bin/phpunit",
@@ -57,7 +58,8 @@
     },
     "config": {
         "allow-plugins": {
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "ergebnis/composer-normalize": true
         }
     }
 }
