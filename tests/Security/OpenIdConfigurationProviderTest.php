@@ -71,7 +71,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'redirectUri' => self::REDIRECT_URI,
             'cacheDuration' => 3600,
             'leeway' => 30,
-            ], [
+        ], [
             'httpClient' => $mockHttpClient,
         ]);
     }
@@ -106,7 +106,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
             'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
-            'cacheDuration' => -10
+            'cacheDuration' => -10,
         ], []);
     }
 
@@ -120,7 +120,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
             'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
-            'leeway' => -10
+            'leeway' => -10,
         ], []);
     }
 
@@ -201,19 +201,18 @@ class OpenIdConfigurationProviderTest extends TestCase
         $endSessionUrl = $this->provider->getEndSessionUrl();
         $this->assertSame($expected, $endSessionUrl);
 
-        $expectedUrl = $expected . '&post_logout_redirect_uri=https%3A%2F%2Flogout.test';
+        $expectedUrl = $expected.'&post_logout_redirect_uri=https%3A%2F%2Flogout.test';
         $endSessionUrl = $this->provider->getEndSessionUrl('https://logout.test');
         $this->assertSame($expectedUrl, $endSessionUrl);
 
-        $expectedState = $expected . '&state=test-state';
+        $expectedState = $expected.'&state=test-state';
         $endSessionUrl = $this->provider->getEndSessionUrl(null, 'test-state');
         $this->assertSame($expectedState, $endSessionUrl);
 
-        $expectedBoth = $expected . '&post_logout_redirect_uri=https%3A%2F%2Flogout.test' . '&state=test-state';
+        $expectedBoth = $expected.'&post_logout_redirect_uri=https%3A%2F%2Flogout.test&state=test-state';
         $endSessionUrl = $this->provider->getEndSessionUrl('https://logout.test', 'test-state');
         $this->assertSame($expectedBoth, $endSessionUrl);
     }
-
 
     public function testGetBaseAccessTokenUrl(): void
     {
@@ -222,7 +221,6 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $this->assertSame($expected, $tokenUrl);
     }
-
 
     public function testValidateIdTokenSuccess(): void
     {
@@ -246,7 +244,6 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertEquals(self::CLIENT_ID, $claims->aud);
     }
 
-
     public function testValidateIdTokenFailure(): void
     {
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
@@ -257,7 +254,6 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $this->provider->validateIdToken('token', self::NONCE);
     }
-
 
     public function testValidateIdTokenAudience(): void
     {
@@ -273,7 +269,6 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
-
     public function testValidateIdTokenIssuer(): void
     {
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
@@ -287,7 +282,6 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $this->provider->validateIdToken('token', self::NONCE);
     }
-
 
     public function testValidateIdTokenNonce(): void
     {
@@ -356,11 +350,11 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         $expected = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/logout?p=test-policy';
 
-        $expectedWithToken = $expected . '&id_token_hint=my-id-token';
+        $expectedWithToken = $expected.'&id_token_hint=my-id-token';
         $endSessionUrl = $this->provider->getEndSessionUrl(null, null, 'my-id-token');
         $this->assertSame($expectedWithToken, $endSessionUrl);
 
-        $expectedAll = $expected . '&post_logout_redirect_uri=https%3A%2F%2Flogout.test&state=test-state&id_token_hint=my-id-token';
+        $expectedAll = $expected.'&post_logout_redirect_uri=https%3A%2F%2Flogout.test&state=test-state&id_token_hint=my-id-token';
         $endSessionUrl = $this->provider->getEndSessionUrl('https://logout.test', 'test-state', 'my-id-token');
         $this->assertSame($expectedAll, $endSessionUrl);
     }
@@ -545,7 +539,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetConfigurationCacheHit(): void
     {
         $configuration = json_decode(
-            file_get_contents(__DIR__ . '/../MockData/mockOpenIDConfiguration.json'),
+            file_get_contents(__DIR__.'/../MockData/mockOpenIDConfiguration.json'),
             true
         );
 
@@ -622,8 +616,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
-        $exception = new class ('Connection refused') extends \RuntimeException implements ClientExceptionInterface
-        {
+        $exception = new class('Connection refused') extends \RuntimeException implements ClientExceptionInterface {
         };
         $mockHttpClient->method('request')->willThrowException($exception);
 
@@ -734,7 +727,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
         $configuration = json_decode(
-            file_get_contents(__DIR__ . '/../MockData/mockOpenIDConfiguration.json'),
+            file_get_contents(__DIR__.'/../MockData/mockOpenIDConfiguration.json'),
             true
         );
 
@@ -753,6 +746,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             if (str_contains($key, 'jwks')) {
                 return $jwksCacheItem;
             }
+
             return $configCacheItem;
         });
 
@@ -780,8 +774,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
-        $exception = new class ('Invalid cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException
-        {
+        $exception = new class('Invalid cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException {
         };
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
         $mockCacheItemPool->method('getItem')->willThrowException($exception);
@@ -808,7 +801,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
         $configuration = json_decode(
-            file_get_contents(__DIR__ . '/../MockData/mockOpenIDConfiguration.json'),
+            file_get_contents(__DIR__.'/../MockData/mockOpenIDConfiguration.json'),
             true
         );
 
@@ -816,8 +809,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $configCacheItem->method('isHit')->willReturn(true);
         $configCacheItem->method('get')->willReturn($configuration);
 
-        $exception = new class ('Invalid jwks cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException
-        {
+        $exception = new class('Invalid jwks cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException {
         };
 
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
@@ -825,6 +817,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             if (str_contains($key, 'jwks')) {
                 throw $exception;
             }
+
             return $configCacheItem;
         });
 
@@ -893,18 +886,17 @@ class OpenIdConfigurationProviderTest extends TestCase
     }
 
     /**
-     * Get a mock success response with mock date
+     * Get a mock success response with mock date.
      *
      * @param string $mockResponseDataPath
-     *   Path to the file containing the mock response data
+     *                                     Path to the file containing the mock response data
      *
      * @return ResponseInterface
-     *   A success ("200") response with mock body data
-     *
+     *                           A success ("200") response with mock body data
      */
     private function getMockHttpSuccessResponse(string $mockResponseDataPath): ResponseInterface
     {
-        $mockResponseData = file_get_contents(__DIR__ . $mockResponseDataPath);
+        $mockResponseData = file_get_contents(__DIR__.$mockResponseDataPath);
 
         $mockStream = $this->createStub(StreamInterface::class);
         $mockStream->method('getContents')->willReturn($mockResponseData);
@@ -917,9 +909,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     }
 
     /**
-     * Get a stdClass object of mock claims
-     *
-     * @return \stdClass
+     * Get a stdClass object of mock claims.
      */
     private function getMockClaims(): \stdClass
     {

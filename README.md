@@ -171,92 +171,86 @@ try {
 
 ## Development Setup
 
-A `docker-compose.yml` file with a PHP 7.4 image is included in this project.
-To install the dependencies you can run
+A `docker-compose.yml` file with a PHP 8.3+ image is included in this project.
+A [Taskfile](https://taskfile.dev/) is used to run common development tasks.
+
+To set up the project:
 
 ```shell
-docker compose up -d
-docker compose exec phpfpm composer install
+task setup
+```
+
+This starts the Docker containers and installs Composer dependencies.
+
+### Running All CI Checks
+
+To run all checks locally (coding standards, static analysis, tests):
+
+```shell
+task pr:actions
 ```
 
 ### Unit Testing
 
-A PhpUnit/Mockery setup is included in this library. To run the unit tests:
-
 ```shell
-docker compose exec phpfpm composer install
-docker compose exec phpfpm ./vendor/bin/phpunit
+task test
 ```
 
-The test suite uses [Mockery](https://github.com/mockery/mockery) in order mock
+### Test Matrix
+
+Run the test suite across all supported PHP versions (8.3, 8.4, 8.5) with both
+lowest and stable dependencies, mirroring the CI matrix:
+
+```shell
+task test:matrix
+```
+
+This runs PHPUnit with coverage for each combination and prints a summary of
+pass/fail results.
+
+The test suite uses [Mockery](https://github.com/mockery/mockery) to mock
 [public static methods](http://docs.mockery.io/en/latest/reference/public_static_properties.html?highlight=static)
 in 3rd party libraries like the `JWT::decode` method from `firebase/jwt`.
 
-### PHPStan static analysis
-
-Where using [PHPStan](https://phpstan.org/) for static analysis. To run
-phpstan do
+### PHPStan Static Analysis
 
 ```shell
-docker compose exec phpfpm composer install
-docker compose exec phpfpm ./vendor/bin/phpstan
+task analyze
 ```
 
-### Check Coding Standard
+### Coding Standards
 
-The following command let you test that the code follows
-the coding standard for the project.
+Check all coding standards:
 
-* PHP files (PHP-CS-Fixer)
+```shell
+task lint
+```
 
-    ```shell
-    docker compose exec phpfpm composer check-coding-standards
-    ```
+Fix PHP coding standards (php-cs-fixer):
 
-* Markdown files (markdownlint standard rules)
+```shell
+task lint:php:fix
+```
 
-    ```shell
-    docker compose run --rm markdownlint markdownlint '**/*.md'
-    ```
+Fix Markdown files:
 
-* Yaml files
+```shell
+task lint:markdown:fix
+```
 
-    ```shell
-    docker compose run --rm prettier '**/*.{yml,yaml}' --check
-    ```
+Fix YAML files:
 
-### Apply Coding Standards
+```shell
+task lint:yaml:fix
+```
 
-To attempt to automatically fix coding style
+### Available Tasks
 
-* PHP files (PHP-CS-Fixer)
+Run `task --list` to see all available tasks.
 
-    ```sh
-    docker compose exec phpfpm composer apply-coding-standards
-    ```
-
-* Markdown files (markdownlint standard rules)
-
-    ```shell
-    docker compose run --rm markdownlint markdownlint '**/*.md' --fix
-    ```
-
-* Yaml files
-
-    ```shell
-    docker compose run --rm prettier '**/*.{yml,yaml}' --write
-    ```
-  
 ## CI
 
-Github Actions are used to run the test suite and code style checks on all PR's.
-
-If you wish to test against the jobs locally you can install [act](https://github.com/nektos/act).
-Then do:
-
-```shell
-act -P ubuntu-latest=shivammathur/node:latest pull_request
-```
+GitHub Actions are used to run the test suite and code style checks on all PRs.
 
 ## Versioning
 

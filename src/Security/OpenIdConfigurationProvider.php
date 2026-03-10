@@ -6,19 +6,19 @@ namespace ItkDev\OpenIdConnect\Security;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use ItkDev\OpenIdConnect\Exception\BadUrlException;
 use ItkDev\OpenIdConnect\Exception\CacheException;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\CodeException;
 use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
-use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
-use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
-use ItkDev\OpenIdConnect\Exception\BadUrlException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
+use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
+use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use League\OAuth2\Client\Provider\AbstractProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
@@ -64,9 +64,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * OpenIdConfigurationProvider constructor.
      *
-     * @param array $options
-     * @param array $collaborators
-     *
      * @throws ItkOpenIdConnectException
      */
     public function __construct(array $options = [], array $collaborators = [])
@@ -74,9 +71,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
         parent::__construct($options, $collaborators);
 
         if (!array_key_exists('cacheItemPool', $options)) {
-            throw new \InvalidArgumentException(
-                'Required options not defined: cacheItemPool'
-            );
+            throw new \InvalidArgumentException('Required options not defined: cacheItemPool');
         }
         $this->setCacheItemPool($options['cacheItemPool']);
 
@@ -89,9 +84,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
 
         if (!array_key_exists('openIDConnectMetadataUrl', $options)) {
-            throw new \InvalidArgumentException(
-                'Required options not defined: openIDConnectMetadataUrl'
-            );
+            throw new \InvalidArgumentException('Required options not defined: openIDConnectMetadataUrl');
         }
 
         if (empty($collaborators['jwt'])) {
@@ -99,13 +92,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
         $this->setRequestFactory($collaborators['jwt']);
 
-        $this->setAllowHttp((bool)($options['allowHttp'] ?? false));
+        $this->setAllowHttp((bool) ($options['allowHttp'] ?? false));
         $this->setOpenIDConnectMetadataUrl($options['openIDConnectMetadataUrl']);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getGuarded(): array
     {
         // Prevent these option from being set by direct access by the
@@ -113,17 +103,12 @@ class OpenIdConfigurationProvider extends AbstractProvider
         return ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway', 'allowHttp'];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getBaseAuthorizationUrl(): string
     {
         return $this->getConfiguration('authorization_endpoint');
     }
 
     /**
-     * {@inheritdoc}
-     *
      * @throws ItkOpenIdConnectException
      */
     public function getAuthorizationUrl(array $options = []): string
@@ -149,20 +134,20 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Get the end session endpoint from the metadata url
+     * Get the end session endpoint from the metadata url.
      *
      * @see https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-a-sign-out-request
      * @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
      *
      * @param string|null $postLogoutRedirectUri
-     *   The URL that the user should be redirected to after successful sign out.
+     *                                           The URL that the user should be redirected to after successful sign out
      * @param string|null $state
-     *   If a state parameter is included in the request, the same value should appear in the response. The application should verify that the state values in the request and response are identical.
+     *                                           If a state parameter is included in the request, the same value should appear in the response. The application should verify that the state values in the request and response are identical.
      * @param string|null $idToken
-     *   The id token.
+     *                                           The id token
      *
      * @return string
-     *   The Url to redirect the client to for session logout
+     *                The Url to redirect the client to for session logout
      *
      * @throws CacheException
      * @throws HttpException
@@ -186,8 +171,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
 
         if (!empty($params)) {
-            $glue = parse_url($url, PHP_URL_QUERY) === null ? '?' : '&';
-            $url .= $glue . $this->buildQueryString($params);
+            $glue = null === parse_url($url, PHP_URL_QUERY) ? '?' : '&';
+            $url .= $glue.$this->buildQueryString($params);
         }
 
         return $url;
@@ -205,13 +190,12 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * will apply globally until overwritten.
      *
      * @param string $idToken
-     *   Raw id token
-     *
+     *                        Raw id token
      * @param string $nonce
-     *   Nonce
+     *                        Nonce
      *
      * @return object
-     *   The JWT's payload as a PHP object
+     *                The JWT's payload as a PHP object
      *
      * @throws ItkOpenIdConnectException
      */
@@ -227,18 +211,18 @@ class OpenIdConfigurationProvider extends AbstractProvider
             // (cf. https://openid.net/specs/openid-connect-core-1_0.html#IDToken).
             $audiences = (array) $claims->aud;
             if (!in_array($this->clientId, $audiences)) {
-                throw new ClaimsException('ID token has incorrect audience(s): ' . implode(', ', $audiences));
+                throw new ClaimsException('ID token has incorrect audience(s): '.implode(', ', $audiences));
             }
             if ($claims->iss !== $this->getConfiguration('issuer')) {
-                throw new ClaimsException('ID token has incorrect issuer: ' . $claims->iss);
+                throw new ClaimsException('ID token has incorrect issuer: '.$claims->iss);
             }
             if ($claims->nonce !== $nonce) {
-                throw new ClaimsException('ID token has incorrect nonce: ' . $claims->nonce);
+                throw new ClaimsException('ID token has incorrect nonce: '.$claims->nonce);
             }
 
             return $claims;
         } catch (\UnexpectedValueException $e) {
-            throw new ValidationException('ID token validation failed: ' . $e->getMessage());
+            throw new ValidationException('ID token validation failed: '.$e->getMessage());
         }
     }
 
@@ -246,10 +230,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Get id token from code.
      *
      * @param string $code
-     *   The code
+     *                     The code
      *
      * @return string
-     *   The ID token.
+     *                The ID token
      *
      * @throws CodeException
      * @throws ClientExceptionInterface
@@ -265,14 +249,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
                     'redirect_uri' => $this->redirectUri,
                     'grant_type' => 'authorization_code',
                     'code' => $code,
-                ]
+                ],
             ]);
 
-            $payload = json_decode((string)$response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+            $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
             return $payload['id_token'];
         } catch (\Exception $e) {
-            throw new CodeException('Get ID token failed: ' . $e->getMessage(), 0, $e);
+            throw new CodeException('Get ID token failed: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -280,10 +264,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the state parameter in an
      * authorization flow.
      *
-     * @param  int $length
-     *   Length of the random string to be generated.
+     * @param int $length
+     *                    Length of the random string to be generated
+     *
      * @return string
-     *   The generated state
+     *                The generated state
      */
     public function generateState(int $length = 32): string
     {
@@ -296,35 +281,28 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the nonce parameter in an
      * authorization flow.
      *
-     * @param  int $length
-     *   Length of the random string to be generated.
+     * @param int $length
+     *                    Length of the random string to be generated
+     *
      * @return string
-     *   The generated nonce
+     *                The generated nonce
      */
     public function generateNonce(int $length = 32): string
     {
         return parent::getRandomState($length);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getBaseAccessTokenUrl(array $params): string
     {
         return $this->getConfiguration('token_endpoint');
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getResourceOwnerDetailsUrl(AccessToken $token): string
     {
         return $this->getConfiguration('userinfo_endpoint');
     }
 
     /**
-     * @inheritdoc
-     *
      * @see https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-authentication-requests
      */
     public function getDefaultScopes(): array
@@ -332,9 +310,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
         return ['openid'];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     protected function checkResponse(ResponseInterface $response, $data): void
     {
         $error = null;
@@ -350,9 +325,6 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
     }
 
-    /**
-     * @inheritdoc
-     */
     protected function createResourceOwner(array $response, AccessToken $token): ResourceOwnerInterface
     {
         return new GenericResourceOwner($response, $this->responseResourceOwnerId);
@@ -362,7 +334,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Get JWT verification keys from Azure Active Directory.
      *
      * @return array
-     *   Array of keys
+     *               Array of keys
      *
      * @throws ItkOpenIdConnectException
      */
@@ -384,13 +356,13 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
                 foreach ($jwks['keys'] as $key) {
                     $kid = (string) $key['kid'];
-                    if ($key['kty'] === 'RSA') {
+                    if ('RSA' === $key['kty']) {
                         $e = self::base64urlDecode($key['e']);
                         $n = self::base64urlDecode($key['n']);
                         $publicKey = XMLSecurityKey::convertRSA($n, $e);
                         $keys[$kid] = new Key($publicKey, 'RS256');
                     } else {
-                        throw new KeyException('Unsupported key data for key id: ' . $kid);
+                        throw new KeyException('Unsupported key data for key id: '.$kid);
                     }
                 }
 
@@ -406,11 +378,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Decode base 64 url
-     *
-     * @param string $input
-     *
-     * @return string
+     * Decode base 64 url.
      *
      * @throws DecodeException
      */
@@ -418,19 +386,18 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         $decoded = base64_decode(strtr($input, '-_', '+/'), true);
 
-        if ($decoded === false) {
-            throw new DecodeException('Error url decoding input ' . $input);
+        if (false === $decoded) {
+            throw new DecodeException('Error url decoding input '.$input);
         }
+
         return $decoded;
     }
 
     /**
-     * Fetch remote json resource
-     *
-     * @param string $resourceUrl
+     * Fetch remote json resource.
      *
      * @return array
-     *   Json decoded to array
+     *               Json decoded to array
      *
      * @throws HttpException
      * @throws JsonException
@@ -441,7 +408,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $response = $this->getHttpClient()->request('GET', $resourceUrl);
 
             if (200 !== $response->getStatusCode()) {
-                throw new HttpException('Cannot access json resource: ' .  $resourceUrl);
+                throw new HttpException('Cannot access json resource: '.$resourceUrl);
             }
 
             $content = $response->getBody()->getContents();
@@ -461,10 +428,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Get Configuration option for key.
      *
      * @param string $key
-     *  The configuration key
+     *                    The configuration key
      *
      * @return string
-     *   The configuration value for the given key
+     *                The configuration value for the given key
      *
      * @throws CacheException
      * @throws HttpException
@@ -489,7 +456,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             if (isset($configuration[$key])) {
                 $value = (string) $configuration[$key];
             } else {
-                throw new CacheException('Required config key not defined: ' . $key);
+                throw new CacheException('Required config key not defined: '.$key);
             }
 
             return $value;
@@ -508,9 +475,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Set the provider cache item pool
-     *
-     * @param CacheItemPoolInterface $cacheItemPool
+     * Set the provider cache item pool.
      */
     private function setCacheItemPool(CacheItemPoolInterface $cacheItemPool): void
     {
@@ -518,10 +483,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Set the provider cache duration
+     * Set the provider cache duration.
      *
      * @param int $cacheDuration
-     *   The cache duration in seconds
+     *                           The cache duration in seconds
      *
      * @throws NegativeCacheDurationException
      */
@@ -534,12 +499,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Set the leeway to allow for clock skew between hosting server and provider
+     * Set the leeway to allow for clock skew between hosting server and provider.
      *
      * @param int $leeway
-     *   The leeway in seconds. Must be positive
-     *
-     * @return void
+     *                    The leeway in seconds. Must be positive
      *
      * @throws NegativeLeewayException
      */
@@ -555,9 +518,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Set allow HTTP.
      *
      * @param bool $allowHttp
-     *   Whether to allow HTTP.
-     *
-     * @return void
+     *                        Whether to allow HTTP
      */
     private function setAllowHttp(bool $allowHttp): void
     {
@@ -565,9 +526,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * Set the OpenID Connect Metadata Url
-     *
-     * @param string $url
+     * Set the OpenID Connect Metadata Url.
      *
      * @throws ItkOpenIdConnectException
      */
@@ -576,11 +535,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
         $scheme = parse_url($url, PHP_URL_SCHEME);
 
         if (null === $scheme) {
-            throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: ' . $url);
+            throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: '.$url);
         }
 
         if (!$this->allowHttp && 'https' !== $scheme) {
-            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: ' . $url);
+            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: '.$url);
         }
 
         $this->openIDConnectMetadataUrl = $url;

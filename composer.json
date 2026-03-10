@@ -28,9 +28,8 @@
         "robrichards/xmlseclibs": "^3.1"
     },
     "require-dev": {
-        "dealerdirect/phpcodesniffer-composer-installer": "^1.2",
         "ergebnis/composer-normalize": "^2.50",
-        "escapestudios/symfony2-coding-standard": "^3.18",
+        "friendsofphp/php-cs-fixer": "^3.75",
         "mockery/mockery": "^1.6.12",
         "phpstan/phpstan": "^2.1.40",
         "phpunit/php-code-coverage": "^12",
@@ -48,16 +47,15 @@
     },
     "config": {
         "allow-plugins": {
-            "dealerdirect/phpcodesniffer-composer-installer": true,
             "ergebnis/composer-normalize": true
         }
     },
     "scripts": {
         "apply-coding-standards": [
-            "phpcbf --standard=phpcs.xml.dist"
+            "vendor/bin/php-cs-fixer fix"
         ],
         "check-coding-standards": [
-            "phpcs --standard=phpcs.xml.dist"
+            "vendor/bin/php-cs-fixer fix --dry-run --diff"
         ],
         "test": "XDEBUG_MODE=coverage ./vendor/bin/phpunit"
     }
