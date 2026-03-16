@@ -1,30 +1,30 @@
-# itk-version: 3.2.4
-networks:
-    frontend:
-        external: true
-    app:
-        driver: bridge
-        internal: false
+# itk-version: 3.2.1
 
 services:
     phpfpm:
         image: itkdev/php8.3-fpm:latest
-        user: ${COMPOSE_USER:-deploy}
-        networks:
-            - app
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
         environment:
             - PHP_XDEBUG_MODE=${PHP_XDEBUG_MODE:-off}
             - PHP_MAX_EXECUTION_TIME=30
             - PHP_MEMORY_LIMIT=256M
             # Depending on the setup, you may have to remove --read-envelope-from from msmtp (cf. https://marlam.de/msmtp/msmtp.html) or use SMTP to send mail
             - PHP_SENDMAIL_PATH=/usr/bin/msmtp --host=mail --port=1025 --read-recipients --read-envelope-from
-            - DOCKER_HOST_DOMAIN=${COMPOSE_DOMAIN:?}
+            - DOCKER_HOST_DOMAIN=${COMPOSE_DOMAIN}
+            - COMPOSER_VERSION=2
             - PHP_IDE_CONFIG=serverName=localhost
         volumes:
             - .:/app
             - composer-cache:/home/deploy/.composer/cache
+
+    phpfpm84:
+        extends:
+            service: phpfpm
+        image: itkdev/php8.4-fpm:latest
+
+    phpfpm85:
+        extends:
+            service: phpfpm
+        image: itkdev/php8.5-fpm:latest
 
     # Test matrix services (PHP version × dependency set)
     phpfpm83-stable:
@@ -45,8 +45,7 @@ services:
 
     phpfpm84-stable:
         extends:
-            service: phpfpm
-        image: itkdev/php8.4-fpm:latest
+            service: phpfpm84
         volumes:
             - .:/app
             - phpfpm84-stable-vendor:/app/vendor
@@ -54,8 +53,7 @@ services:
 
     phpfpm84-lowest:
         extends:
-            service: phpfpm
-        image: itkdev/php8.4-fpm:latest
+            service: phpfpm84
         volumes:
             - .:/app
             - phpfpm84-lowest-vendor:/app/vendor
@@ -63,8 +61,7 @@ services:
 
     phpfpm85-stable:
         extends:
-            service: phpfpm
-        image: itkdev/php8.5-fpm:latest
+            service: phpfpm85
         volumes:
             - .:/app
             - phpfpm85-stable-vendor:/app/vendor
@@ -72,8 +69,7 @@ services:
 
     phpfpm85-lowest:
         extends:
-            service: phpfpm
-        image: itkdev/php8.5-fpm:latest
+            service: phpfpm85
         volumes:
             - .:/app
             - phpfpm85-lowest-vendor:/app/vendor

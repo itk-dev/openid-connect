@@ -52,16 +52,16 @@ jobs:
                     - service: phpfpm
                       php: "8.3"
                       prefer: prefer-stable
-                    - service: phpfpm84-stable
+                    - service: phpfpm84
                       php: "8.4"
                       prefer: prefer-lowest
-                    - service: phpfpm84-stable
+                    - service: phpfpm84
                       php: "8.4"
                       prefer: prefer-stable
-                    - service: phpfpm85-stable
+                    - service: phpfpm85
                       php: "8.5"
                       prefer: prefer-lowest
-                    - service: phpfpm85-stable
+                    - service: phpfpm85
                       php: "8.5"
                       prefer: prefer-stable
         steps:
