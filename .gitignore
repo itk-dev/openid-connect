@@ -17,4 +17,4 @@ phpcs-report.xml
 .phpunit.result.cache
 .phpunit.cache
 .php-cs-fixer.cache
-unit.xml
+coverage/
