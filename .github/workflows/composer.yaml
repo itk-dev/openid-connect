@@ -37,12 +37,9 @@ on:
 
 jobs:
     composer-validate:
-        name: Validate composer (${{ matrix.prefer }})
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
-            matrix:
-                prefer: [prefer-lowest, prefer-stable]
         steps:
             - uses: actions/checkout@v5
 
