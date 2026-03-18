@@ -18,3 +18,4 @@ phpcs-report.xml
 .phpunit.cache
 .php-cs-fixer.cache
 coverage/
+yarn.lock
