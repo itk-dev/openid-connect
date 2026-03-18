@@ -71,12 +71,12 @@ tasks:
         cmds:
             - "{{.COMPOSER}} normalize"
 
-  composer:check:
-    desc: Validate and audit composer
-    cmds:
-      - "{{.PHP}} composer validate --strict"
-      - "{{.COMPOSER}} normalize --dry-run"
-      - "{{.COMPOSER}} audit"
+    composer:check:
+        desc: Validate and audit composer
+        cmds:
+            - "{{.PHP}} composer validate --strict"
+            - "{{.COMPOSER}} normalize --dry-run"
+            - "{{.COMPOSER}} audit"
 
     # Code quality
 
@@ -177,21 +177,22 @@ tasks:
         vars:
             RESULTS_FILE:
                 sh: mktemp
-    cmds:
-      - task: test:matrix:run
-        vars: { PHP: "8.3", DEPS: lowest, RESULTS_FILE: "{{.RESULTS_FILE}}" }
-      - task: test:matrix:run
-        vars: { PHP: "8.3", DEPS: stable, RESULTS_FILE: "{{.RESULTS_FILE}}" }
-      - task: test:matrix:run
-        vars: { PHP: "8.4", DEPS: lowest, RESULTS_FILE: "{{.RESULTS_FILE}}" }
-      - task: test:matrix:run
-        vars: { PHP: "8.4", DEPS: stable, RESULTS_FILE: "{{.RESULTS_FILE}}" }
-      - task: test:matrix:run
-        vars: { PHP: "8.5", DEPS: lowest, RESULTS_FILE: "{{.RESULTS_FILE}}" }
-      - task: test:matrix:run
-        vars: { PHP: "8.5", DEPS: stable, RESULTS_FILE: "{{.RESULTS_FILE}}" }
-      - task: test:summary
-        vars: { RESULTS_FILE: "{{.RESULTS_FILE}}" }
+        cmds:
+            - task: test:matrix:run
+              vars: { PHP: "8.3", DEPS: lowest, RESULTS_FILE: "{{.RESULTS_FILE}}" }
+            - task: test:matrix:run
+              vars: { PHP: "8.3", DEPS: stable, RESULTS_FILE: "{{.RESULTS_FILE}}" }
+            - task: test:matrix:run
+              vars: { PHP: "8.4", DEPS: lowest, RESULTS_FILE: "{{.RESULTS_FILE}}" }
+            - task: test:matrix:run
+              vars: { PHP: "8.4", DEPS: stable, RESULTS_FILE: "{{.RESULTS_FILE}}" }
+            - task: test:matrix:run
+              vars: { PHP: "8.5", DEPS: lowest, RESULTS_FILE: "{{.RESULTS_FILE}}" }
+            - task: test:matrix:run
+              vars: { PHP: "8.5", DEPS: stable, RESULTS_FILE: "{{.RESULTS_FILE}}" }
+            - task: test:summary
+              vars: { RESULTS_FILE: "{{.RESULTS_FILE}}" }
+
     test:matrix:run:
         internal: true
         desc: Run a single matrix combination and record the result
