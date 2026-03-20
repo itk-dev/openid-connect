@@ -4,6 +4,7 @@
   "token_endpoint": "https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy",
   "end_session_endpoint": "https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/logout?p=test-policy",
   "jwks_uri": "https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy",
+  "userinfo_endpoint": "https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/openid/userinfo?p=test-policy",
   "response_modes_supported": [
     "query",
     "fragment",

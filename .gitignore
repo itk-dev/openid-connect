@@ -16,3 +16,6 @@ build
 phpcs-report.xml
 .phpunit.result.cache
 .phpunit.cache
+.php-cs-fixer.cache
+coverage/
+yarn.lock
