@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-03-20
+
 - Achieved 100% test coverage (methods and lines)
 - Fixed JWKS verification keys not being persisted to cache
 - Documented JWT::$leeway static property limitation and exp claim validation
@@ -130,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.0.3...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.0...HEAD
+[4.1.0]: https://github.com/itk-dev/openid-connect/compare/4.0.3...4.1.0
 [4.0.3]: https://github.com/itk-dev/openid-connect/compare/4.0.2...4.0.3
 [4.0.2]: https://github.com/itk-dev/openid-connect/compare/4.0.1...4.0.2
 [4.0.1]: https://github.com/itk-dev/openid-connect/compare/4.0.0...4.0.1
