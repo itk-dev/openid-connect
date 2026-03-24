@@ -142,7 +142,7 @@ tasks:
     test:coverage:
         desc: Run tests with coverage
         cmds:
-            - "{{.PHP}} vendor/bin/phpunit --coverage-clover=coverage/unit.xml"
+            - "{{.DOCKER_COMPOSE}} exec -e XDEBUG_MODE=coverage phpfpm vendor/bin/phpunit --coverage-text --coverage-clover=coverage/unit.xml"
 
     test:run:
         desc: "Run tests for a PHP version and dependency set (e.g. task test:run PHP=8.4 DEPS=lowest)"
@@ -162,6 +162,7 @@ tasks:
                       cp /app/vendor/.composer.lock /app/composer.lock
                       composer install -q
                     else
+                      rm -f /app/composer.lock
                       composer update -q --{{.PREFER}}
                       cp /app/composer.lock /app/vendor/.composer.lock
                     fi'
@@ -170,7 +171,7 @@ tasks:
     test:matrix:reset:
         desc: Remove cached vendor volumes to force a fresh dependency resolve
         cmds:
-            - "{{.DOCKER_COMPOSE}} down --volumes"
+            - "{{.DOCKER_COMPOSE}} --profile ci down --volumes"
 
     test:matrix:
         desc: Run tests across all PHP versions (mirrors CI matrix)
