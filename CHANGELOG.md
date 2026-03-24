@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Bumped `actions/checkout` from v5 to v6 in all CI workflows
+- Added `ci` profile to docker-compose matrix services to avoid starting them during local development
+- Fixed `test:coverage` task to run via docker-compose with `XDEBUG_MODE=coverage`
+- Fixed `test:run` to remove stale `composer.lock` before `composer update`
+- Fixed `test:matrix:reset` to use `--profile ci` flag
+- Removed unused `.markdownlint.json`
+
 ## [4.1.0] - 2026-03-20
 
 - Achieved 100% test coverage (methods and lines)
