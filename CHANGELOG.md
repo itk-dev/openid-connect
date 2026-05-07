@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-05-07
+
+### Security
+
+- Bumped `robrichards/xmlseclibs` constraint to `^3.1.5` to address
+  [CVE-2026-32313](https://github.com/advisories/GHSA-4v26-v6cg-g6f9)
+  (high severity — missing AES-GCM authentication tag validation on
+  encrypted nodes). The library uses xmlseclibs only for RSA key
+  construction (`XMLSecurityKey::convertRSA`), but consumers are
+  protected against the encrypted-node decryption issue regardless.
+
 ## [4.1.0] - 2026-03-20
 
 - Achieved 100% test coverage (methods and lines)
@@ -132,7 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.0...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.1...HEAD
+[4.1.1]: https://github.com/itk-dev/openid-connect/compare/4.1.0...4.1.1
 [4.1.0]: https://github.com/itk-dev/openid-connect/compare/4.0.3...4.1.0
 [4.0.3]: https://github.com/itk-dev/openid-connect/compare/4.0.2...4.0.3
 [4.0.2]: https://github.com/itk-dev/openid-connect/compare/4.0.1...4.0.2
