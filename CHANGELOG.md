@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Chained `previous` consistently in `OpenIdConfigurationProvider` catch
+  blocks (`validateIdToken`, `getJwtVerificationKeys`, `fetchJsonResource`,
+  `getConfiguration`) so consumers can walk back to the underlying
+  Guzzle/firebase/PSR exception via `getPrevious()`
+- Tightened `@throws` phpdoc on public methods (`validateIdToken`,
+  `getIdToken`, `getBaseAuthorizationUrl`) to enumerate the actual
+  transitive exceptions instead of declaring only the parent type. Removed
+  the inaccurate `ClientExceptionInterface` declaration on `getIdToken`
+  (the catch-all wraps it as `CodeException` with the original chained)
+- Documented HTTP timeout/proxy/verify configuration via constructor `$options`
+  (capability already provided by league/oauth2-client; no code change)
 - Bumped `actions/checkout` from v5 to v6 in all CI workflows
 - Added `ci` profile to docker-compose matrix services to avoid starting them during local development
 - Fixed `test:coverage` task to run via docker-compose with `XDEBUG_MODE=coverage`
