@@ -77,6 +77,33 @@ $provider = new OpenIdConfigurationProvider([
 ]);
 ```
 
+##### HTTP timeout, proxy, and TLS verification
+
+This library extends `league/oauth2-client`, which uses Guzzle for HTTP. To
+bound how long a request to the IdP can take (recommended for production),
+pass `timeout` (seconds) in the constructor `$options`:
+
+```php
+$provider = new OpenIdConfigurationProvider([
+    // ... required options ...
+    'timeout' => 5,
+    'proxy' => 'http://proxy.example.com:8080',
+    'verify' => true, // only consulted by Guzzle when proxy is set
+]);
+```
+
+`league/oauth2-client` whitelists exactly these three keys (`timeout`, `proxy`,
+`verify`) and forwards them to the underlying Guzzle client. Other Guzzle
+options (e.g. `connect_timeout`) are silently dropped.
+
+> **Why Guzzle and not Symfony HttpClient?**
+> `league/oauth2-client` hard-types its HTTP client as
+> `GuzzleHttp\ClientInterface`. Symfony HttpClient implements PSR-18 / HTTPlug,
+> not Guzzle's interface, and there is no maintained adapter going Symfony →
+> Guzzle. To plug in a non-Guzzle client you would need to write such an
+> adapter yourself and pass it via `$collaborators['httpClient']` to the
+> constructor.
+
 ##### Leeway
 
 To account for clock skew times between the signing and verifying servers,
