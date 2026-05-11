@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-05-11
+
 - Chained `previous` consistently in `OpenIdConfigurationProvider` catch
   blocks (`validateIdToken`, `getJwtVerificationKeys`, `fetchJsonResource`,
   `getConfiguration`) so consumers can walk back to the underlying
@@ -161,7 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.1...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.2...HEAD
+[4.1.2]: https://github.com/itk-dev/openid-connect/compare/4.1.1...4.1.2
 [4.1.1]: https://github.com/itk-dev/openid-connect/compare/4.1.0...4.1.1
 [4.1.0]: https://github.com/itk-dev/openid-connect/compare/4.0.3...4.1.0
 [4.0.3]: https://github.com/itk-dev/openid-connect/compare/4.0.2...4.0.3
