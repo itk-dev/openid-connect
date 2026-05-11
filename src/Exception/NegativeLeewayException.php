@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class NegativeLeewayException extends ItkOpenIdConnectException
+class NegativeLeewayException extends \InvalidArgumentException implements OpenIdConnectExceptionInterface
 {
 }

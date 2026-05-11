@@ -19,3 +19,6 @@ phpcs-report.xml
 .php-cs-fixer.cache
 coverage/
 yarn.lock
+
+# Per-developer Claude Code context — local tooling, not part of the public source.
+/CLAUDE.md

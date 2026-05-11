@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class KeyException extends ItkOpenIdConnectException
+class KeyException extends \RuntimeException implements OpenIdConnectExceptionInterface
 {
 }

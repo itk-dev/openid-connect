@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class JsonException extends ItkOpenIdConnectException
+class JsonException extends \RuntimeException implements OpenIdConnectExceptionInterface
 {
 }

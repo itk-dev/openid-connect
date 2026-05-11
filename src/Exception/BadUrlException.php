@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class BadUrlException extends ItkOpenIdConnectException
+class BadUrlException extends \LogicException implements OpenIdConnectExceptionInterface
 {
 }

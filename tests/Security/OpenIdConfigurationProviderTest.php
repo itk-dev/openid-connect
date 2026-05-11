@@ -12,8 +12,8 @@ use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\CodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
-use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
@@ -179,7 +179,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetAuthorizationUrlStateException(): void
     {
-        $this->expectException(ItkOpenIdConnectException::class);
+        $this->expectException(MissingParameterException::class);
         $this->expectExceptionMessage('Required parameter "state" missing');
 
         $authUrl = $this->provider->getAuthorizationUrl(['nonce' => 'abcd']);
@@ -187,7 +187,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetAuthorizationUrlNonceException(): void
     {
-        $this->expectException(ItkOpenIdConnectException::class);
+        $this->expectException(MissingParameterException::class);
         $this->expectExceptionMessage('Required parameter "nonce" missing');
 
         $authUrl = $this->provider->getAuthorizationUrl(['state' => 'abcd']);
@@ -512,7 +512,9 @@ class OpenIdConfigurationProviderTest extends TestCase
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
-        $mockHttpClient->method('request')->willThrowException(new \RuntimeException('Connection failed'));
+        $mockHttpClient->method('request')->willThrowException(
+            new class('Connection failed') extends \RuntimeException implements ClientExceptionInterface {}
+        );
 
         $mockCacheItem = $this->createStub(CacheItemInterface::class);
         $mockCacheItem->method('isHit')->willReturn(false);

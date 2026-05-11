@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING)
+
+- **Exception hierarchy reworked.** Every exception thrown from a public
+  method now implements
+  `\ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface` (new
+  marker interface, extends `\Throwable`). Concrete exception classes now
+  extend the SPL type that best describes the failure category:
+  `\RuntimeException` (network/cache/data — `CacheException`,
+  `HttpException`, `JsonException`, `DecodeException`, `KeyException`,
+  `CodeException`, `ValidationException`, `ClaimsException`),
+  `\LogicException` (programmer/config bug — `BadUrlException`,
+  `IllegalSchemeException`, `MissingParameterException`),
+  `\InvalidArgumentException` (invalid input — `ConfigurationException`,
+  `NegativeCacheDurationException`, `NegativeLeewayException`).
+  Consumers catching `ItkOpenIdConnectException` should migrate to
+  `OpenIdConnectExceptionInterface`; the abstract class is kept as a
+  `@deprecated` alias and still implements the marker, but **concrete
+  exceptions no longer extend it**, so existing `catch
+  (ItkOpenIdConnectException $e)` blocks will not match anything thrown
+  by 5.0+ code.
+- `OpenIdConfigurationProvider::__construct` now throws
+  `ConfigurationException` (new, `\InvalidArgumentException`-typed)
+  instead of a raw `\InvalidArgumentException` when a required option
+  is missing. The new type implements the marker; existing
+  `catch (\InvalidArgumentException $e)` blocks continue to match.
+- `OpenIdConfigurationProvider::getIdToken` narrowed its boundary
+  `catch` from `\Exception` to
+  `IdentityProviderException|ClientExceptionInterface|\JsonException`.
+  Cache failures during `getConfiguration` (called for the token
+  endpoint lookup) now propagate as `CacheException` rather than being
+  re-wrapped as `CodeException`. Both implement the marker, so a
+  consumer catching that is unaffected; a consumer catching only
+  `CodeException` will need to widen to the marker for this code path.
+
+### Added
+
+- `ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface`
+  marker for catching every OIDC failure from this library.
+- `ItkDev\OpenIdConnect\Exception\ConfigurationException` for missing
+  or invalid constructor options.
+- `tests/Exception/ExceptionHierarchyTest.php` locks the contract:
+  every concrete implements the marker, extends the correct SPL parent,
+  and is caught by a `catch (OpenIdConnectExceptionInterface $e)`
+  block. Failing this test class is the early warning that the public
+  contract has drifted.
+
+### Deprecated
+
+- `ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException` abstract
+  class (catch `OpenIdConnectExceptionInterface` instead). Kept through
+  5.x; removal scheduled for 6.0.
+
+### Documentation
+
+- Added a new "Exception handling" section to `README.md` describing the
+  marker interface, the SPL parents of each concrete, the PSR-18
+  co-implementation on `HttpException`, and the 4.x → 5.0 catch-block
+  migration. Also fixed the `validateIdToken` example to catch the
+  marker interface instead of the now-deprecated abstract.
+
 ## [4.1.2] - 2026-05-11
 
 - Chained `previous` consistently in `OpenIdConfigurationProvider` catch

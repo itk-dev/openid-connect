@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class MissingParameterException extends ItkOpenIdConnectException
+class MissingParameterException extends \LogicException implements OpenIdConnectExceptionInterface
 {
 }
