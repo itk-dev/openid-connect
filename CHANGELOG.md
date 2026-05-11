@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-05-11
+
+- Chained `previous` consistently in `OpenIdConfigurationProvider` catch
+  blocks (`validateIdToken`, `getJwtVerificationKeys`, `fetchJsonResource`,
+  `getConfiguration`) so consumers can walk back to the underlying
+  Guzzle/firebase/PSR exception via `getPrevious()`
+- Tightened `@throws` phpdoc on public methods (`validateIdToken`,
+  `getIdToken`, `getBaseAuthorizationUrl`) to enumerate the actual
+  transitive exceptions instead of declaring only the parent type. Removed
+  the inaccurate `ClientExceptionInterface` declaration on `getIdToken`
+  (the catch-all wraps it as `CodeException` with the original chained)
+- Documented HTTP timeout/proxy/verify configuration via constructor `$options`
+  (capability already provided by league/oauth2-client; no code change)
+- Bumped `actions/checkout` from v5 to v6 in all CI workflows
+- Added `ci` profile to docker-compose matrix services to avoid starting them during local development
+- Fixed `test:coverage` task to run via docker-compose with `XDEBUG_MODE=coverage`
+- Fixed `test:run` to remove stale `composer.lock` before `composer update`
+- Fixed `test:matrix:reset` to use `--profile ci` flag
+- Removed unused `.markdownlint.json`
+
 ## [4.1.1] - 2026-05-07
 
 ### Security
@@ -143,7 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.1...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.2...HEAD
+[4.1.2]: https://github.com/itk-dev/openid-connect/compare/4.1.1...4.1.2
 [4.1.1]: https://github.com/itk-dev/openid-connect/compare/4.1.0...4.1.1
 [4.1.0]: https://github.com/itk-dev/openid-connect/compare/4.0.3...4.1.0
 [4.0.3]: https://github.com/itk-dev/openid-connect/compare/4.0.2...4.0.3

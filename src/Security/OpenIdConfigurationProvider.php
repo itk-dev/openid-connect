@@ -103,6 +103,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
         return ['cacheItemPool', 'cacheDuration', 'openIDConnectMetadataUrl', 'leeway', 'allowHttp'];
     }
 
+    /**
+     * @throws CacheException
+     * @throws HttpException
+     * @throws JsonException
+     */
     public function getBaseAuthorizationUrl(): string
     {
         return $this->getConfiguration('authorization_endpoint');
@@ -197,7 +202,13 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @return object
      *                The JWT's payload as a PHP object
      *
-     * @throws ItkOpenIdConnectException
+     * @throws CacheException
+     * @throws ClaimsException
+     * @throws DecodeException
+     * @throws HttpException
+     * @throws JsonException
+     * @throws KeyException
+     * @throws ValidationException
      */
     public function validateIdToken(string $idToken, string $nonce): object
     {
@@ -222,7 +233,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
             return $claims;
         } catch (\UnexpectedValueException $e) {
-            throw new ValidationException('ID token validation failed: '.$e->getMessage());
+            throw new ValidationException('ID token validation failed: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -235,8 +246,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @return string
      *                The ID token
      *
-     * @throws CodeException
-     * @throws ClientExceptionInterface
+     * @throws CodeException Wraps any \Exception thrown by token-endpoint HTTP, JSON parsing, or `getConfiguration()` (with `previous` chained)
      */
     public function getIdToken(string $code): string
     {
@@ -371,7 +381,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $this->cacheItemPool->save($item);
             }
         } catch (InvalidArgumentException $e) {
-            throw new CacheException($e->getMessage());
+            throw new CacheException($e->getMessage(), 0, $e);
         }
 
         return $keys;
@@ -418,9 +428,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
             return $resource;
         } catch (ClientExceptionInterface $e) {
-            throw new HttpException($e->getMessage());
+            throw new HttpException($e->getMessage(), 0, $e);
         } catch (\JsonException $e) {
-            throw new JsonException($e->getMessage());
+            throw new JsonException($e->getMessage(), 0, $e);
         }
     }
 
@@ -461,7 +471,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
             return $value;
         } catch (InvalidArgumentException $e) {
-            throw new CacheException($e->getMessage());
+            throw new CacheException($e->getMessage(), 0, $e);
         }
     }
 

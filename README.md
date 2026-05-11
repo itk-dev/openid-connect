@@ -3,7 +3,7 @@
 [![Github](https://img.shields.io/badge/source-itk--dev/openid--connect-blue?style=flat-square)](https://github.com/itk-dev/openid-connect)
 [![Release](https://img.shields.io/packagist/v/itk-dev/openid-connect.svg?style=flat-square&label=release)](https://packagist.org/packages/itk-dev/openid-connect)
 [![PHP Version](https://img.shields.io/packagist/php-v/itk-dev/openid-connect.svg?style=flat-square&colorB=%238892BF)](https://www.php.net/downloads)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/itk-dev/openid-connect/pr.yaml?label=CI&logo=github&style=flat-square)](https://github.com/itk-dev/openid-connect/actions?query=workflow%3A%22Test+%26+Code+Style+Review%22)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/itk-dev/openid-connect/php.yaml?branch=develop&label=CI&logo=github&style=flat-square)](https://github.com/itk-dev/openid-connect/actions/workflows/php.yaml?query=branch%3Adevelop)
 [![Codecov Code Coverage](https://img.shields.io/codecov/c/gh/itk-dev/openid-connect?label=codecov&logo=codecov&style=flat-square)](https://codecov.io/gh/itk-dev/openid-connect)
 [![Read License](https://img.shields.io/packagist/l/itk-dev/openid-connect.svg?style=flat-square&colorB=darkcyan)](https://github.com/itk-dev/openid-connect/blob/master/LICENSE.md)
 [![Package downloads on Packagist](https://img.shields.io/packagist/dt/itk-dev/openid-connect.svg?style=flat-square&colorB=darkmagenta)](https://packagist.org/packages/itk-dev/openid-connect/stats)
@@ -76,6 +76,33 @@ $provider = new OpenIdConfigurationProvider([
     'allowHttp' => true, // Defaults to false. Allow OIDC urls with http scheme. Use only during development!
 ]);
 ```
+
+##### HTTP timeout, proxy, and TLS verification
+
+This library extends `league/oauth2-client`, which uses Guzzle for HTTP. To
+bound how long a request to the IdP can take (recommended for production),
+pass `timeout` (seconds) in the constructor `$options`:
+
+```php
+$provider = new OpenIdConfigurationProvider([
+    // ... required options ...
+    'timeout' => 5,
+    'proxy' => 'http://proxy.example.com:8080',
+    'verify' => true, // only consulted by Guzzle when proxy is set
+]);
+```
+
+`league/oauth2-client` whitelists exactly these three keys (`timeout`, `proxy`,
+`verify`) and forwards them to the underlying Guzzle client. Other Guzzle
+options (e.g. `connect_timeout`) are silently dropped.
+
+> **Why Guzzle and not Symfony HttpClient?**
+> `league/oauth2-client` hard-types its HTTP client as
+> `GuzzleHttp\ClientInterface`. Symfony HttpClient implements PSR-18 / HTTPlug,
+> not Guzzle's interface, and there is no maintained adapter going Symfony →
+> Guzzle. To plug in a non-Guzzle client you would need to write such an
+> adapter yourself and pass it via `$collaborators['httpClient']` to the
+> constructor.
 
 ##### Leeway
 
