@@ -889,9 +889,6 @@ class OpenIdConfigurationProviderTest extends TestCase
     /**
      * Get a mock success response with mock date.
      *
-     * @param string $mockResponseDataPath
-     *                                     Path to the file containing the mock response data
-     *
      * @return ResponseInterface
      *                           A success ("200") response with mock body data
      */
