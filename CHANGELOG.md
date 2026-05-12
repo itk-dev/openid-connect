@@ -142,6 +142,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tooling
 
+- Bumped PHPStan from `level: 8` to `level: max` in `phpstan.neon`.
+  The preceding PRs in the 5.0 series (constructor option shapes,
+  JSON-payload narrowing, claim shape on `validateIdToken`, JWKS
+  validation, test-side Mockery / fixture / claim narrowings) cleared
+  every max-level error; the bump is the final one-line config
+  change that locks in the strictest analysis level for future
+  contributions.
 - `OpenIdConfigurationProvider::__construct` now declares an
   `array{cacheItemPool?: CacheItemPoolInterface,
   openIDConnectMetadataUrl?: string, cacheDuration?: int, leeway?: int,
