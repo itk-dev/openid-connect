@@ -75,6 +75,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after the document type rather than the individual key is more
   accurate. Consumers catching the marker are unaffected; consumers
   catching the concrete class need to swap the name.
+- `OpenIdConfigurationProvider::getJwtVerificationKeys` declares its
+  return type as `array<string, Key>` (was just `array`), matching
+  the actual shape the method builds. Lets `validateIdToken` pass
+  the cached keys to `JWT::decode` without a `mixed` flow at
+  `level: max`.
+- `OpenIdConfigurationProvider::validateIdToken` narrows its
+  `$claims` local via inline `@var \stdClass&object{aud, iss,
+  nonce}` so the spec-required claim accesses
+  (`$claims->aud` / `$claims->iss` / `$claims->nonce`) type-check at
+  `level: max`. No runtime change — these values are guaranteed
+  present and string-typed by the OIDC spec and `firebase/php-jwt`
+  already enforces JWT validity.
 
 ### Documentation
 

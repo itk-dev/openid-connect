@@ -222,6 +222,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             // NB: JWT::$leeway is a static property shared across all instances.
             // Always set it immediately before decode to ensure the correct value.
             JWT::$leeway = $this->leeway;
+            /** @var \stdClass&object{aud: string|array<string>, iss: string, nonce: string} $claims */
             $claims = JWT::decode($idToken, $keys);
             // "aud" may be an array of strings or a single string
             // (cf. https://openid.net/specs/openid-connect-core-1_0.html#IDToken).
@@ -356,8 +357,8 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Get JWT verification keys from Azure Active Directory.
      *
-     * @return array
-     *               Array of keys
+     * @return array<string, Key>
+     *                            Array of keys indexed by JWK `kid`
      *
      * @throws OpenIdConnectExceptionInterface
      */
@@ -372,6 +373,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $item = $this->cacheItemPool->getItem($cacheKey);
 
             if ($item->isHit()) {
+                /** @var array<string, Key> $keys (we only ever store this shape) */
                 $keys = (array) $item->get();
             } else {
                 $keysUri = $this->getConfiguration('jwks_uri');
