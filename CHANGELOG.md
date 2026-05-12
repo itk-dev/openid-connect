@@ -88,6 +88,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tooling
 
+- `OpenIdConfigurationProvider::__construct` now declares an
+  `array{cacheItemPool?: CacheItemPoolInterface,
+  openIDConnectMetadataUrl?: string, cacheDuration?: int, leeway?: int,
+  allowHttp?: bool, ...}` PHPDoc shape for the `$options` parameter
+  (plus a corresponding shape on `$collaborators` for the `jwt` /
+  `httpClient` keys). PHPStan can now narrow each setter argument to
+  the expected type instead of seeing `mixed`. Behaviour unchanged —
+  removes 4 errors when running PHPStan at `level: max`. Also drops a
+  now-redundant `is_int($options['leeway'])` runtime check that
+  became a `function.alreadyNarrowedType` tautology once the shape
+  was in place (PHP itself enforces the `int` via the `setLeeway`
+  signature under `declare(strict_types=1)`).
 - PHPStan now scans `tests/` in addition to `src/` at level 8, with
   `reportIgnoresWithoutComments: true` so unexplained
   `@phpstan-ignore` directives fail CI.
