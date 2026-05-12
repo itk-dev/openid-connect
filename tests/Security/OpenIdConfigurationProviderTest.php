@@ -226,6 +226,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenSuccess(): void
     {
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
 
@@ -249,6 +250,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenFailure(): void
     {
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
 
@@ -260,6 +262,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenAudience(): void
     {
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = 'incorrect aud';
@@ -274,6 +277,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenIssuer(): void
     {
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->iss = 'incorrect iss';
@@ -288,6 +292,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenNonce(): void
     {
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->nonce = 'incorrect nonce';
@@ -429,11 +434,13 @@ class OpenIdConfigurationProviderTest extends TestCase
         $method = new \ReflectionMethod(OpenIdConfigurationProvider::class, 'createResourceOwner');
 
         $owner = $method->invoke($this->provider, ['id' => '123', 'name' => 'Test'], $token);
+        $this->assertInstanceOf(\League\OAuth2\Client\Provider\ResourceOwnerInterface::class, $owner);
         $this->assertSame('123', $owner->getId());
     }
 
     public function testValidateIdTokenArrayAudience(): void
     {
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = [self::CLIENT_ID, 'other_client'];
@@ -449,6 +456,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenArrayAudienceInvalid(): void
     {
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = ['wrong_client_1', 'wrong_client_2'];
@@ -847,6 +855,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
         $this->expectException(JwksException::class);
@@ -892,6 +901,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
         $this->expectException(JwksException::class);
@@ -937,6 +947,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
@@ -1050,6 +1061,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
+        /** @var \Mockery\MockInterface $mockJWT */
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
         $this->expectException(\ItkDev\OpenIdConnect\Exception\DecodeException::class);
@@ -1070,7 +1082,7 @@ class OpenIdConfigurationProviderTest extends TestCase
      * unreadable / not valid JSON, rather than letting `false` or `null` flow
      * silently into the assertion under test.
      *
-     * @return array<string, mixed>
+     * @return array<mixed> top-level decoded JSON; callers cast / narrow as needed
      */
     private function loadMockFixture(string $filename): array
     {
