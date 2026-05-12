@@ -16,6 +16,7 @@ use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\MetadataException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
@@ -108,6 +109,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     public function getBaseAuthorizationUrl(): string
     {
@@ -158,6 +160,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     public function getEndSessionUrl(?string $postLogoutRedirectUri = null, ?string $state = null, ?string $idToken = null): string
     {
@@ -209,6 +212,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws HttpException
      * @throws JsonException
      * @throws KeyException
+     * @throws MetadataException
      * @throws ValidationException
      */
     public function validateIdToken(string $idToken, string $nonce): object
@@ -370,7 +374,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $jwks = $this->fetchJsonResource($keysUri);
 
                 foreach ($jwks['keys'] as $key) {
-                    $kid = (string) $key['kid'];
+                    if (!is_string($key['kid'] ?? null)) {
+                        throw new KeyException('JWK entry missing string "kid" (RFC 7517 §4.5)');
+                    }
+                    $kid = $key['kid'];
                     if ('RSA' === $key['kty']) {
                         $e = self::base64urlDecode($key['e']);
                         $n = self::base64urlDecode($key['n']);
@@ -451,6 +458,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     private function getConfiguration(string $key): string
     {
@@ -468,13 +476,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $this->cacheItemPool->save($item);
             }
 
-            if (isset($configuration[$key])) {
-                $value = (string) $configuration[$key];
-            } else {
-                throw new CacheException('Required config key not defined: '.$key);
+            if (!isset($configuration[$key])) {
+                throw new MetadataException('OIDC discovery document missing required key: '.$key);
+            }
+            if (!is_string($configuration[$key])) {
+                throw new MetadataException(sprintf('OIDC discovery document value for "%s" is not a string (got %s)', $key, get_debug_type($configuration[$key])));
             }
 
-            return $value;
+            return $configuration[$key];
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage(), 0, $e);
         }

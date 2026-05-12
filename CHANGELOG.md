@@ -40,6 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-wrapped as `CodeException`. Both implement the marker, so a
   consumer catching that is unaffected; a consumer catching only
   `CodeException` will need to widen to the marker for this code path.
+- `OpenIdConfigurationProvider` now throws `KeyException` when a JWK
+  entry is missing a string `kid` (RFC 7517 §4.5), and the new
+  `MetadataException` when an OIDC discovery document is missing a
+  required key or has a non-string value at one. Previously the
+  non-string value was silently coerced via `(string)` cast, and both
+  validation failures bubbled as `CacheException` — semantically
+  misleading since the failure is the IdP-returned payload not
+  conforming to the OIDC Discovery schema, not the cache layer
+  misbehaving. All three throw types implement the marker interface,
+  so consumers catching that are unaffected; consumers catching
+  `CacheException` specifically for the missing-key case will need to
+  widen to the marker or to `MetadataException`.
 
 ### Added
 
@@ -47,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marker for catching every OIDC failure from this library.
 - `ItkDev\OpenIdConnect\Exception\ConfigurationException` for missing
   or invalid constructor options.
+- `ItkDev\OpenIdConnect\Exception\MetadataException` (extends
+  `\RuntimeException`, implements the marker) for IdP-returned OIDC
+  discovery documents that parse as JSON but don't conform to the
+  OIDC Discovery spec (missing required key, wrong type at a required
+  key). Distinct from `JsonException` (parse failure) and
+  `CacheException` (PSR-6 cache layer failure) — different remediation
+  paths (retry doesn't help; the IdP needs to fix its payload).
 - `tests/Exception/ExceptionHierarchyTest.php` locks the contract:
   every concrete implements the marker, extends the correct SPL parent,
   and is caught by a `catch (OpenIdConnectExceptionInterface $e)`
