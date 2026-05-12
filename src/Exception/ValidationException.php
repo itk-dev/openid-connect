@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class ValidationException extends ItkOpenIdConnectException
+class ValidationException extends \RuntimeException implements OpenIdConnectExceptionInterface
 {
 }

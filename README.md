@@ -185,16 +185,57 @@ if (!$sessionState || $request->query->get('state') !== $sessionState) {
 
 // Validate the id token. This will validate the token against the keys published by the
 // provider (Azure AD B2C). If the token is invalid or the nonce doesn't match an
-// exception will thrown.
+// exception will be thrown.
 try {
     $claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
     // Authentication successful
-} catch (ItkOpenIdConnectException $exception) {
+} catch (OpenIdConnectExceptionInterface $exception) {
     // Handle failed authentication
 } finally {
     $this->session->remove('oauth2nonce');
 }
 ```
+
+### Exception handling
+
+Every exception thrown from a public method of this library implements
+`\ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface`. Catch the
+marker to handle any OIDC failure with a single block, or scope to a more
+specific type when you need to discriminate:
+
+```php
+use ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface;
+
+try {
+    $claims = $provider->validateIdToken($idToken, $nonce);
+} catch (OpenIdConnectExceptionInterface $e) {
+    // Cause is preserved via $e->getPrevious()
+}
+```
+
+Concrete exception classes extend the SPL type that describes the failure
+category, so a `catch` block scoped to that SPL type will also match:
+
+| SPL parent | Concrete types | Category |
+| ---------- | -------------- | -------- |
+| `\RuntimeException` | `CacheException`, `HttpException`, `JsonException`, `DecodeException`, `KeyException`, `CodeException`, `ValidationException`, `ClaimsException` | Network, cache, token validation, claims mismatch — transient or data-shape failures |
+| `\LogicException` | `BadUrlException`, `IllegalSchemeException`, `MissingParameterException` | Programmer/config bugs — should be fixed in code |
+| `\InvalidArgumentException` | `ConfigurationException`, `NegativeCacheDurationException`, `NegativeLeewayException` | Invalid input to the constructor / setters |
+
+`HttpException` additionally implements PSR-18's
+`Psr\Http\Client\ClientExceptionInterface`, so existing PSR-18-aware
+consumers can keep catching on the standard PSR marker.
+
+Every wrap site preserves the underlying cause via `$previous`, so
+`$e->getPrevious()` walks back to the originating Guzzle, firebase/php-jwt
+or PSR-6 cache exception.
+
+> **Upgrading from 4.x:** the concrete exceptions no longer extend the
+> abstract `ItkOpenIdConnectException`. Catches written as
+> `catch (ItkOpenIdConnectException $e)` will not match anything thrown
+> by 5.0+ code — migrate to `catch (OpenIdConnectExceptionInterface $e)`.
+> The abstract class itself is kept through 5.x as a documented alias
+> (`@deprecated`); removal is scheduled for 6.0.
 
 ## Development Setup
 

@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class CacheException extends ItkOpenIdConnectException
+class CacheException extends \RuntimeException implements OpenIdConnectExceptionInterface
 {
 }

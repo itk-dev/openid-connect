@@ -1,7 +1,12 @@
+includes:
+	- phpstan-baseline.neon
+
 parameters:
 	level: 8
 	paths:
 		- src
+		- tests
+	reportIgnoresWithoutComments: true
 	ignoreErrors:
 		-
 			identifier: missingType.iterableValue

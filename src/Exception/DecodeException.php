@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class DecodeException extends ItkOpenIdConnectException
+class DecodeException extends \RuntimeException implements OpenIdConnectExceptionInterface
 {
 }

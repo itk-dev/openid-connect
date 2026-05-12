@@ -10,15 +10,16 @@ use ItkDev\OpenIdConnect\Exception\BadUrlException;
 use ItkDev\OpenIdConnect\Exception\CacheException;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\CodeException;
+use ItkDev\OpenIdConnect\Exception\ConfigurationException;
 use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
-use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
+use ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use League\OAuth2\Client\Provider\AbstractProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
@@ -64,14 +65,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * OpenIdConfigurationProvider constructor.
      *
-     * @throws ItkOpenIdConnectException
+     * @throws OpenIdConnectExceptionInterface
      */
     public function __construct(array $options = [], array $collaborators = [])
     {
         parent::__construct($options, $collaborators);
 
         if (!array_key_exists('cacheItemPool', $options)) {
-            throw new \InvalidArgumentException('Required options not defined: cacheItemPool');
+            throw new ConfigurationException('Required options not defined: cacheItemPool');
         }
         $this->setCacheItemPool($options['cacheItemPool']);
 
@@ -84,7 +85,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
 
         if (!array_key_exists('openIDConnectMetadataUrl', $options)) {
-            throw new \InvalidArgumentException('Required options not defined: openIDConnectMetadataUrl');
+            throw new ConfigurationException('Required options not defined: openIDConnectMetadataUrl');
         }
 
         if (empty($collaborators['jwt'])) {
@@ -114,7 +115,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * @throws ItkOpenIdConnectException
+     * @throws OpenIdConnectExceptionInterface
      */
     public function getAuthorizationUrl(array $options = []): string
     {
@@ -246,7 +247,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @return string
      *                The ID token
      *
-     * @throws CodeException Wraps any \Exception thrown by token-endpoint HTTP, JSON parsing, or `getConfiguration()` (with `previous` chained)
+     * @throws OpenIdConnectExceptionInterface
      */
     public function getIdToken(string $code): string
     {
@@ -265,7 +266,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
             return $payload['id_token'];
-        } catch (\Exception $e) {
+        } catch (IdentityProviderException|ClientExceptionInterface|\JsonException $e) {
+            // Narrow boundary: IdentityProviderException from league's checkResponse,
+            // ClientExceptionInterface from Guzzle, \JsonException from json_decode.
+            // Other failures (e.g. CacheException from getConfiguration) propagate
+            // as their own concrete OpenIdConnectExceptionInterface subtypes.
             throw new CodeException('Get ID token failed: '.$e->getMessage(), 0, $e);
         }
     }
@@ -346,7 +351,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @return array
      *               Array of keys
      *
-     * @throws ItkOpenIdConnectException
+     * @throws OpenIdConnectExceptionInterface
      */
     private function getJwtVerificationKeys(): array
     {
@@ -538,7 +543,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set the OpenID Connect Metadata Url.
      *
-     * @throws ItkOpenIdConnectException
+     * @throws OpenIdConnectExceptionInterface
      */
     private function setOpenIDConnectMetadataUrl(string $url): void
     {

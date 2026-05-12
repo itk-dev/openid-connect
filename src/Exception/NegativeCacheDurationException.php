@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class NegativeCacheDurationException extends ItkOpenIdConnectException
+class NegativeCacheDurationException extends \InvalidArgumentException implements OpenIdConnectExceptionInterface
 {
 }

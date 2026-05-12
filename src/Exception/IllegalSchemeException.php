@@ -2,6 +2,6 @@
 
 namespace ItkDev\OpenIdConnect\Exception;
 
-class IllegalSchemeException extends ItkOpenIdConnectException
+class IllegalSchemeException extends \LogicException implements OpenIdConnectExceptionInterface
 {
 }
