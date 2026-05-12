@@ -11,7 +11,7 @@ use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
-use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\JwksException;
 use ItkDev\OpenIdConnect\Exception\MetadataException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
@@ -59,7 +59,7 @@ class ExceptionHierarchyTest extends TestCase
         yield 'HttpException' => [HttpException::class, \RuntimeException::class];
         yield 'JsonException' => [JsonException::class, \RuntimeException::class];
         yield 'DecodeException' => [DecodeException::class, \RuntimeException::class];
-        yield 'KeyException' => [KeyException::class, \RuntimeException::class];
+        yield 'JwksException' => [JwksException::class, \RuntimeException::class];
         yield 'CodeException' => [CodeException::class, \RuntimeException::class];
         yield 'ValidationException' => [ValidationException::class, \RuntimeException::class];
         yield 'ClaimsException' => [ClaimsException::class, \RuntimeException::class];

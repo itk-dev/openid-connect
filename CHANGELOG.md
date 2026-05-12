@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marker interface, extends `\Throwable`). Concrete exception classes now
   extend the SPL type that best describes the failure category:
   `\RuntimeException` (network/cache/data — `CacheException`,
-  `HttpException`, `JsonException`, `DecodeException`, `KeyException`,
+  `HttpException`, `JsonException`, `DecodeException`, `JwksException`,
   `CodeException`, `ValidationException`, `ClaimsException`),
   `\LogicException` (programmer/config bug — `BadUrlException`,
   `IllegalSchemeException`, `MissingParameterException`),
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-wrapped as `CodeException`. Both implement the marker, so a
   consumer catching that is unaffected; a consumer catching only
   `CodeException` will need to widen to the marker for this code path.
-- `OpenIdConfigurationProvider` now throws `KeyException` when a JWK
+- `OpenIdConfigurationProvider` now throws `JwksException` when a JWK
   entry is missing a string `kid` (RFC 7517 §4.5), and the new
   `MetadataException` when an OIDC discovery document is missing a
   required key or has a non-string value at one. Previously the
@@ -52,6 +52,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so consumers catching that are unaffected; consumers catching
   `CacheException` specifically for the missing-key case will need to
   widen to the marker or to `MetadataException`.
+- `OpenIdConfigurationProvider::getJwtVerificationKeys` now validates
+  the JWKS payload at each level before reading values: the top-level
+  `keys` property must be an array (`JwksException` otherwise), each
+  entry must be a JSON object (`JwksException` otherwise), each entry's
+  `kty` must be a string (`JwksException` otherwise), and for RSA keys
+  the `e` and `n` modulus/exponent values must both be strings
+  (`JwksException` otherwise). Previously these dynamic fields were
+  accessed without checking and would either silently produce a
+  garbage `Key`, trigger a PHP type error in the base64 decode, or
+  fail downstream in `XMLSecurityKey::convertRSA`. The new behaviour
+  fails at the malformed-payload boundary with a precise message.
+- `OpenIdConfigurationProvider::getIdToken` now throws `CodeException`
+  when the token endpoint's JSON response is missing a string
+  `id_token`. Previously this would have returned `mixed` from
+  `$payload['id_token']` and produced confusing errors at the call
+  site.
+- Renamed `KeyException` → `JwksException` for symmetry with
+  `MetadataException` and clearer scope: the type fires on both
+  JWKS-document-level errors (`keys` array missing) and JWK-entry-
+  level errors (missing `kid` / `kty` / `e` / `n`), so naming it
+  after the document type rather than the individual key is more
+  accurate. Consumers catching the marker are unaffected; consumers
+  catching the concrete class need to swap the name.
+
+### Documentation
+
+- Added class-level PHPDoc to every concrete exception in
+  `src/Exception/` describing what it represents, when it's thrown,
+  the rationale for its SPL parent type, and the boundary against
+  related concrete types. The audit confirms each of the 15 concretes
+  covers a distinct failure category — none would be handled
+  identically by a reasonable consumer:
+  - `\LogicException` family — `BadUrlException` (URL syntax),
+    `IllegalSchemeException` (http without opt-in),
+    `MissingParameterException` (caller omitted state/nonce).
+  - `\InvalidArgumentException` family — `ConfigurationException`
+    (missing required ctor option), `NegativeCacheDurationException`
+    (value out of range), `NegativeLeewayException` (value out of range).
+  - `\RuntimeException` family — `CacheException` (PSR-6 layer),
+    `HttpException` (transport + PSR-18 `ClientExceptionInterface`),
+    `JsonException` (parse failure), `DecodeException` (JWK base64
+    bytes), `JwksException` (JWKS structure), `CodeException` (token
+    exchange), `ValidationException` (JWT signature/decode),
+    `ClaimsException` (claim values), `MetadataException` (discovery
+    doc structure).
 
 ### Added
 

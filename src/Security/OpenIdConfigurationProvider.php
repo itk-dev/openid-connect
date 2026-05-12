@@ -15,7 +15,7 @@ use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
-use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\JwksException;
 use ItkDev\OpenIdConnect\Exception\MetadataException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
@@ -233,7 +233,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws DecodeException
      * @throws HttpException
      * @throws JsonException
-     * @throws KeyException
+     * @throws JwksException
      * @throws MetadataException
      * @throws ValidationException
      */
@@ -290,6 +290,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
             ]);
 
             $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+
+            if (!is_array($payload) || !is_string($payload['id_token'] ?? null)) {
+                throw new CodeException('Token endpoint response missing string "id_token"');
+            }
 
             return $payload['id_token'];
         } catch (IdentityProviderException|ClientExceptionInterface|\JsonException $e) {
@@ -395,18 +399,31 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $keysUri = $this->getConfiguration('jwks_uri');
                 $jwks = $this->fetchJsonResource($keysUri);
 
+                if (!isset($jwks['keys']) || !is_array($jwks['keys'])) {
+                    throw new JwksException('JWKS payload missing array "keys" property (RFC 7517 §5)');
+                }
+
                 foreach ($jwks['keys'] as $key) {
+                    if (!is_array($key)) {
+                        throw new JwksException('JWK entry is not a JSON object');
+                    }
                     if (!is_string($key['kid'] ?? null)) {
-                        throw new KeyException('JWK entry missing string "kid" (RFC 7517 §4.5)');
+                        throw new JwksException('JWK entry missing string "kid" (RFC 7517 §4.5)');
                     }
                     $kid = $key['kid'];
+                    if (!is_string($key['kty'] ?? null)) {
+                        throw new JwksException('JWK entry missing string "kty" for key id: '.$kid);
+                    }
                     if ('RSA' === $key['kty']) {
+                        if (!is_string($key['e'] ?? null) || !is_string($key['n'] ?? null)) {
+                            throw new JwksException('JWK RSA entry missing string "e"/"n" for key id: '.$kid);
+                        }
                         $e = self::base64urlDecode($key['e']);
                         $n = self::base64urlDecode($key['n']);
                         $publicKey = XMLSecurityKey::convertRSA($n, $e);
                         $keys[$kid] = new Key($publicKey, 'RS256');
                     } else {
-                        throw new KeyException('Unsupported key data for key id: '.$kid);
+                        throw new JwksException('Unsupported key data for key id: '.$kid);
                     }
                 }
 
