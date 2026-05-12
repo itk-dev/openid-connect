@@ -512,6 +512,8 @@ class OpenIdConfigurationProviderTest extends TestCase
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
+        // PSR-18 transport stub — Guzzle's real exceptions need a RequestInterface
+        // we don't have here, and any ClientExceptionInterface satisfies getIdToken's catch.
         $mockHttpClient->method('request')->willThrowException(
             new class('Connection failed') extends \RuntimeException implements ClientExceptionInterface {}
         );

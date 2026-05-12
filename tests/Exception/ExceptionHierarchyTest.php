@@ -101,7 +101,7 @@ class ExceptionHierarchyTest extends TestCase
 
             return;
         }
-        // @phpstan-ignore deadCode.unreachable
+        // @phpstan-ignore deadCode.unreachable (safety net if a future regression breaks the catch-by-marker contract)
         $this->fail('Catch on OpenIdConnectExceptionInterface should have matched '.$concrete);
     }
 
