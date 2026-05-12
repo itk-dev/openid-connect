@@ -90,6 +90,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Added a new "Exception handling" section to `README.md` describing the
+  marker interface, the SPL parents of each concrete, the PSR-18
+  co-implementation on `HttpException`, and the 4.x → 5.0 catch-block
+  migration. Also fixed the `validateIdToken` example to catch the
+  marker interface instead of the now-deprecated abstract.
 - Added class-level PHPDoc to every concrete exception in
   `src/Exception/` describing what it represents, when it's thrown,
   the rationale for its SPL parent type, and the boundary against
@@ -134,14 +139,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException` abstract
   class (catch `OpenIdConnectExceptionInterface` instead). Kept through
   5.x; removal scheduled for 6.0.
-
-### Documentation
-
-- Added a new "Exception handling" section to `README.md` describing the
-  marker interface, the SPL parents of each concrete, the PSR-18
-  co-implementation on `HttpException`, and the 4.x → 5.0 catch-block
-  migration. Also fixed the `validateIdToken` example to catch the
-  marker interface instead of the now-deprecated abstract.
 
 ### Tooling
 
