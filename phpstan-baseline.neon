@@ -23,15 +23,3 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#'
-			identifier: argument.type
-			count: 3
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Parameter \#1 \$string of function parse_str expects string, string\|false\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php

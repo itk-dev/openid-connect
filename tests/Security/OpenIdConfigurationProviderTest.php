@@ -168,7 +168,9 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $authUrl = $this->provider->getAuthorizationUrl(['state' => $state, 'nonce' => $nonce]);
         $query = [];
-        parse_str(parse_url($authUrl, PHP_URL_QUERY), $query);
+        $queryString = parse_url($authUrl, PHP_URL_QUERY);
+        $this->assertIsString($queryString, 'Generated authorization URL must have a query string');
+        parse_str($queryString, $query);
 
         $this->assertSame('openid', $query['scope']);
         $this->assertSame('id_token', $query['response_type']);
@@ -544,10 +546,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetConfigurationCacheHit(): void
     {
-        $configuration = json_decode(
-            file_get_contents(__DIR__.'/../MockData/mockOpenIDConfiguration.json'),
-            true
-        );
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
         $mockCacheItem = $this->createStub(CacheItemInterface::class);
         $mockCacheItem->method('isHit')->willReturn(true);
@@ -732,10 +731,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
 
-        $configuration = json_decode(
-            file_get_contents(__DIR__.'/../MockData/mockOpenIDConfiguration.json'),
-            true
-        );
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
         $cachedKeys = ['key1' => new Key('public-key-data', 'RS256')];
 
@@ -807,10 +803,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetJwtVerificationKeysCacheInvalidArgument(): void
     {
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
-        $configuration = json_decode(
-            file_get_contents(__DIR__.'/../MockData/mockOpenIDConfiguration.json'),
-            true
-        );
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
         $configCacheItem = $this->createStub(CacheItemInterface::class);
         $configCacheItem->method('isHit')->willReturn(true);
@@ -901,6 +894,25 @@ class OpenIdConfigurationProviderTest extends TestCase
      * @return ResponseInterface
      *                           A success ("200") response with mock body data
      */
+    /**
+     * Load a JSON fixture from tests/MockData and decode it as an associative
+     * array. Fails the test with an explicit message if the file is missing /
+     * unreadable / not valid JSON, rather than letting `false` or `null` flow
+     * silently into the assertion under test.
+     *
+     * @return array<string, mixed>
+     */
+    private function loadMockFixture(string $filename): array
+    {
+        $path = __DIR__.'/../MockData/'.$filename;
+        $contents = file_get_contents($path);
+        $this->assertNotFalse($contents, sprintf('Mock fixture not readable: %s', $path));
+        $decoded = json_decode($contents, true);
+        $this->assertIsArray($decoded, sprintf('Mock fixture is not valid JSON: %s', $path));
+
+        return $decoded;
+    }
+
     private function getMockHttpSuccessResponse(string $mockResponseDataPath): ResponseInterface
     {
         $mockResponseData = file_get_contents(__DIR__.$mockResponseDataPath);
