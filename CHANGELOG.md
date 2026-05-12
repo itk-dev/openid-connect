@@ -52,6 +52,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so consumers catching that are unaffected; consumers catching
   `CacheException` specifically for the missing-key case will need to
   widen to the marker or to `MetadataException`.
+- `OpenIdConfigurationProvider::getJwtVerificationKeys` now validates
+  the JWKS payload at each level before reading values: the top-level
+  `keys` property must be an array (`KeyException` otherwise), each
+  entry must be a JSON object (`KeyException` otherwise), each entry's
+  `kty` must be a string (`KeyException` otherwise), and for RSA keys
+  the `e` and `n` modulus/exponent values must both be strings
+  (`KeyException` otherwise). Previously these dynamic fields were
+  accessed without checking and would either silently produce a
+  garbage `Key`, trigger a PHP type error in the base64 decode, or
+  fail downstream in `XMLSecurityKey::convertRSA`. The new behaviour
+  fails at the malformed-payload boundary with a precise message.
+- `OpenIdConfigurationProvider::getIdToken` now throws `CodeException`
+  when the token endpoint's JSON response is missing a string
+  `id_token`. Previously this would have returned `mixed` from
+  `$payload['id_token']` and produced confusing errors at the call
+  site.
 
 ### Added
 
