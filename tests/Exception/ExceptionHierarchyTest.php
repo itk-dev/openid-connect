@@ -121,11 +121,15 @@ class ExceptionHierarchyTest extends TestCase
         // Catch sites that wrote `catch (ItkOpenIdConnectException $e)` should
         // migrate to the marker interface; this assertion guards the marker
         // implementation while the deprecation window is open.
-        $this->assertTrue(
-            is_subclass_of(
-                \ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException::class,
-                OpenIdConnectExceptionInterface::class,
-            ),
+        //
+        // ReflectionClass keeps the check at runtime so PHPStan can't fold it
+        // into a constant tautology — the value of the test is catching a
+        // *future* regression that removes the marker from the abstract.
+        $reflection = new \ReflectionClass(\ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException::class);
+        $this->assertContains(
+            OpenIdConnectExceptionInterface::class,
+            $reflection->getInterfaceNames(),
+            'Deprecated abstract must still implement the marker for 5.x BC.',
         );
     }
 }

@@ -67,6 +67,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migration. Also fixed the `validateIdToken` example to catch the
   marker interface instead of the now-deprecated abstract.
 
+### Tooling
+
+- PHPStan now scans `tests/` in addition to `src/` at level 8, with
+  `reportIgnoresWithoutComments: true` so unexplained
+  `@phpstan-ignore` directives fail CI.
+- Added `phpstan/phpstan-mockery` to `require-dev` for stubs covering
+  Mockery's fluent `shouldReceive(...)->andReturn(...)` API.
+- Cleaned the 46 pre-existing level-8 issues in `tests/`: dropped the
+  unused nullable from `$this->provider`, narrowed `validateIdToken`
+  claim accesses with `object{nonce, aud}` `@var` shapes, replaced
+  silent `(string)` coercion of `file_get_contents` / `parse_url`
+  failures with `assertNotFalse` / `assertIsString` boundary guards,
+  swapped `assertTrue(true)` tautologies for
+  `expectNotToPerformAssertions`, and replaced the constant-folded
+  `is_subclass_of` marker check with a `ReflectionClass` lookup so
+  PHPStan can't fold it into a tautology. `phpstan-baseline.neon`
+  consequently shrinks to zero and is deleted.
+
 ## [4.1.2] - 2026-05-11
 
 - Chained `previous` consistently in `OpenIdConfigurationProvider` catch

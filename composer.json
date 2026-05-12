@@ -32,6 +32,7 @@
         "friendsofphp/php-cs-fixer": "^3.75",
         "mockery/mockery": "^1.6.12",
         "phpstan/phpstan": "^2.1.41",
+        "phpstan/phpstan-mockery": "^2.0",
         "phpunit/php-code-coverage": "^12",
         "phpunit/phpunit": "^12"
     },
