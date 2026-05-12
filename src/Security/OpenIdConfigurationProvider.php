@@ -65,6 +65,28 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * OpenIdConfigurationProvider constructor.
      *
+     * The two well-typed keys (`cacheItemPool`, `openIDConnectMetadataUrl`)
+     * are marked optional in the array shape because the runtime check
+     * throws `ConfigurationException` if they are missing — but their type
+     * is narrowed when present so the downstream setters keep their typed
+     * arguments. Extra keys (league/oauth2-client's `clientId`,
+     * `clientSecret`, `redirectUri`, … and Guzzle's `timeout` / `proxy` /
+     * `verify`) are accepted via `...`.
+     *
+     * @param array{
+     *     cacheItemPool?: CacheItemPoolInterface,
+     *     openIDConnectMetadataUrl?: string,
+     *     cacheDuration?: int,
+     *     leeway?: int,
+     *     allowHttp?: bool,
+     *     ...
+     * } $options
+     * @param array{
+     *     jwt?: \League\OAuth2\Client\Tool\RequestFactory,
+     *     httpClient?: \GuzzleHttp\ClientInterface,
+     *     ...
+     * } $collaborators
+     *
      * @throws OpenIdConnectExceptionInterface
      */
     public function __construct(array $options = [], array $collaborators = [])
@@ -80,7 +102,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $this->setCacheDuration($options['cacheDuration']);
         }
 
-        if (array_key_exists('leeway', $options) && is_int($options['leeway'])) {
+        if (array_key_exists('leeway', $options)) {
             $this->setLeeway($options['leeway']);
         }
 
