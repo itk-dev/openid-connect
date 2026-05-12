@@ -472,10 +472,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
             }
 
             if (!isset($configuration[$key])) {
-                throw new CacheException('Required config key not defined: '.$key);
+                throw new JsonException('OIDC discovery document missing required key: '.$key);
             }
             if (!is_string($configuration[$key])) {
-                throw new CacheException(sprintf('OIDC discovery document value for "%s" is not a string (got %s)', $key, get_debug_type($configuration[$key])));
+                throw new JsonException(sprintf('OIDC discovery document value for "%s" is not a string (got %s)', $key, get_debug_type($configuration[$key])));
             }
 
             return $configuration[$key];

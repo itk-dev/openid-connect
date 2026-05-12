@@ -574,8 +574,8 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetConfigurationMissingKey(): void
     {
-        $this->expectException(CacheException::class);
-        $this->expectExceptionMessage('Required config key not defined: nonexistent_key');
+        $this->expectException(\ItkDev\OpenIdConnect\Exception\JsonException::class);
+        $this->expectExceptionMessage('OIDC discovery document missing required key: nonexistent_key');
 
         $method = new \ReflectionMethod(OpenIdConfigurationProvider::class, 'getConfiguration');
         $method->invoke($this->provider, 'nonexistent_key');
@@ -600,7 +600,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $this->createStub(ClientInterface::class),
         ]);
 
-        $this->expectException(CacheException::class);
+        $this->expectException(\ItkDev\OpenIdConnect\Exception\JsonException::class);
         $this->expectExceptionMessage('OIDC discovery document value for "authorization_endpoint" is not a string (got int)');
 
         $method = new \ReflectionMethod(OpenIdConfigurationProvider::class, 'getConfiguration');
