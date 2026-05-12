@@ -373,6 +373,8 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testCheckResponseSuccess(): void
     {
+        $this->expectNotToPerformAssertions();
+
         $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
 
@@ -380,7 +382,6 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         // Should not throw
         $method->invoke($this->provider, $response, ['data' => 'value']);
-        $this->assertTrue(true);
     }
 
     public function testCheckResponseWithErrorString(): void

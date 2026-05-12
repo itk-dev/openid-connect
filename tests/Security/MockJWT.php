@@ -4,5 +4,5 @@ namespace Tests\Security;
 
 class MockJWT
 {
-    public static $leeway;
+    public static ?int $leeway = null;
 }
