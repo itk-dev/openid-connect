@@ -16,6 +16,7 @@ use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\MetadataException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
@@ -108,6 +109,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     public function getBaseAuthorizationUrl(): string
     {
@@ -158,6 +160,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     public function getEndSessionUrl(?string $postLogoutRedirectUri = null, ?string $state = null, ?string $idToken = null): string
     {
@@ -209,6 +212,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws HttpException
      * @throws JsonException
      * @throws KeyException
+     * @throws MetadataException
      * @throws ValidationException
      */
     public function validateIdToken(string $idToken, string $nonce): object
@@ -454,6 +458,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     private function getConfiguration(string $key): string
     {
@@ -472,10 +477,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
             }
 
             if (!isset($configuration[$key])) {
-                throw new JsonException('OIDC discovery document missing required key: '.$key);
+                throw new MetadataException('OIDC discovery document missing required key: '.$key);
             }
             if (!is_string($configuration[$key])) {
-                throw new JsonException(sprintf('OIDC discovery document value for "%s" is not a string (got %s)', $key, get_debug_type($configuration[$key])));
+                throw new MetadataException(sprintf('OIDC discovery document value for "%s" is not a string (got %s)', $key, get_debug_type($configuration[$key])));
             }
 
             return $configuration[$key];

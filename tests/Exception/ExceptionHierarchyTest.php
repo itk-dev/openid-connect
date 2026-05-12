@@ -12,6 +12,7 @@ use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
 use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\MetadataException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
@@ -62,6 +63,7 @@ class ExceptionHierarchyTest extends TestCase
         yield 'CodeException' => [CodeException::class, \RuntimeException::class];
         yield 'ValidationException' => [ValidationException::class, \RuntimeException::class];
         yield 'ClaimsException' => [ClaimsException::class, \RuntimeException::class];
+        yield 'MetadataException' => [MetadataException::class, \RuntimeException::class];
     }
 
     /**
