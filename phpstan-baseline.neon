@@ -19,18 +19,6 @@ parameters:
 			path: tests/Security/MockJWT.php
 
 		-
-			message: '#^Access to an undefined property object\:\:\$aud\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$nonce\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1

@@ -238,6 +238,7 @@ class OpenIdConfigurationProviderTest extends TestCase
                 )
             )->andReturn($mockClaims);
 
+        /** @var object{nonce: string, aud: string|list<string>} $claims */
         $claims = $this->provider->validateIdToken('token', self::NONCE);
 
         $this->assertEquals(self::NONCE, $claims->nonce);
@@ -436,6 +437,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
+        /** @var object{nonce: string, aud: string|list<string>} $claims */
         $claims = $this->provider->validateIdToken('token', self::NONCE);
 
         $this->assertEquals(self::NONCE, $claims->nonce);
@@ -770,6 +772,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockClaims = $this->getMockClaims();
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
+        /** @var object{nonce: string} $claims */
         $claims = $provider->validateIdToken('token', self::NONCE);
         $this->assertEquals(self::NONCE, $claims->nonce);
     }
