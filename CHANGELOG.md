@@ -7,189 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-05-12
+
+Reworked exception hierarchy and tightened IdP-payload validations. The runtime
+behaviour is unchanged for spec-compliant IdPs — see [UPGRADE-5.0.md](UPGRADE-5.0.md)
+for the consumer migration guide.
+
 ### Changed (BREAKING)
 
-- **Exception hierarchy reworked.** Every exception thrown from a public
-  method now implements
-  `\ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface` (new
-  marker interface, extends `\Throwable`). Concrete exception classes now
-  extend the SPL type that best describes the failure category:
-  `\RuntimeException` (network/cache/data — `CacheException`,
-  `HttpException`, `JsonException`, `DecodeException`, `JwksException`,
-  `CodeException`, `ValidationException`, `ClaimsException`),
-  `\LogicException` (programmer/config bug — `BadUrlException`,
-  `IllegalSchemeException`, `MissingParameterException`),
-  `\InvalidArgumentException` (invalid input — `ConfigurationException`,
-  `NegativeCacheDurationException`, `NegativeLeewayException`).
-  Consumers catching `ItkOpenIdConnectException` should migrate to
-  `OpenIdConnectExceptionInterface`; the abstract class is kept as a
-  `@deprecated` alias and still implements the marker, but **concrete
-  exceptions no longer extend it**, so existing `catch
-  (ItkOpenIdConnectException $e)` blocks will not match anything thrown
-  by 5.0+ code.
-- `OpenIdConfigurationProvider::__construct` now throws
-  `ConfigurationException` (new, `\InvalidArgumentException`-typed)
-  instead of a raw `\InvalidArgumentException` when a required option
-  is missing. The new type implements the marker; existing
-  `catch (\InvalidArgumentException $e)` blocks continue to match.
-- `OpenIdConfigurationProvider::getIdToken` narrowed its boundary
-  `catch` from `\Exception` to
-  `IdentityProviderException|ClientExceptionInterface|\JsonException`.
-  Cache failures during `getConfiguration` (called for the token
-  endpoint lookup) now propagate as `CacheException` rather than being
-  re-wrapped as `CodeException`. Both implement the marker, so a
-  consumer catching that is unaffected; a consumer catching only
-  `CodeException` will need to widen to the marker for this code path.
-- `OpenIdConfigurationProvider` now throws `JwksException` when a JWK
-  entry is missing a string `kid` (RFC 7517 §4.5), and the new
-  `MetadataException` when an OIDC discovery document is missing a
-  required key or has a non-string value at one. Previously the
-  non-string value was silently coerced via `(string)` cast, and both
-  validation failures bubbled as `CacheException` — semantically
-  misleading since the failure is the IdP-returned payload not
-  conforming to the OIDC Discovery schema, not the cache layer
-  misbehaving. All three throw types implement the marker interface,
-  so consumers catching that are unaffected; consumers catching
-  `CacheException` specifically for the missing-key case will need to
-  widen to the marker or to `MetadataException`.
-- `OpenIdConfigurationProvider::getJwtVerificationKeys` now validates
-  the JWKS payload at each level before reading values: the top-level
-  `keys` property must be an array (`JwksException` otherwise), each
-  entry must be a JSON object (`JwksException` otherwise), each entry's
-  `kty` must be a string (`JwksException` otherwise), and for RSA keys
-  the `e` and `n` modulus/exponent values must both be strings
-  (`JwksException` otherwise). Previously these dynamic fields were
-  accessed without checking and would either silently produce a
-  garbage `Key`, trigger a PHP type error in the base64 decode, or
-  fail downstream in `XMLSecurityKey::convertRSA`. The new behaviour
-  fails at the malformed-payload boundary with a precise message.
-- `OpenIdConfigurationProvider::getIdToken` now throws `CodeException`
-  when the token endpoint's JSON response is missing a string
-  `id_token`. Previously this would have returned `mixed` from
-  `$payload['id_token']` and produced confusing errors at the call
-  site.
-- Renamed `KeyException` → `JwksException` for symmetry with
-  `MetadataException` and clearer scope: the type fires on both
-  JWKS-document-level errors (`keys` array missing) and JWK-entry-
-  level errors (missing `kid` / `kty` / `e` / `n`), so naming it
-  after the document type rather than the individual key is more
-  accurate. Consumers catching the marker are unaffected; consumers
-  catching the concrete class need to swap the name.
-- `OpenIdConfigurationProvider::getJwtVerificationKeys` declares its
-  return type as `array<string, Key>` (was just `array`), matching
-  the actual shape the method builds. Lets `validateIdToken` pass
-  the cached keys to `JWT::decode` without a `mixed` flow at
-  `level: max`.
-- `OpenIdConfigurationProvider::validateIdToken` narrows its
-  `$claims` local via inline `@var \stdClass&object{aud, iss,
-  nonce}` so the spec-required claim accesses
-  (`$claims->aud` / `$claims->iss` / `$claims->nonce`) type-check at
-  `level: max`. No runtime change — these values are guaranteed
-  present and string-typed by the OIDC spec and `firebase/php-jwt`
-  already enforces JWT validity.
-
-### Documentation
-
-- Added a new "Exception handling" section to `README.md` describing the
-  marker interface, the SPL parents of each concrete, the PSR-18
-  co-implementation on `HttpException`, and the 4.x → 5.0 catch-block
-  migration. Also fixed the `validateIdToken` example to catch the
-  marker interface instead of the now-deprecated abstract.
-- Added class-level PHPDoc to every concrete exception in
-  `src/Exception/` describing what it represents, when it's thrown,
-  the rationale for its SPL parent type, and the boundary against
-  related concrete types. The audit confirms each of the 15 concretes
-  covers a distinct failure category — none would be handled
-  identically by a reasonable consumer:
-  - `\LogicException` family — `BadUrlException` (URL syntax),
-    `IllegalSchemeException` (http without opt-in),
-    `MissingParameterException` (caller omitted state/nonce).
-  - `\InvalidArgumentException` family — `ConfigurationException`
-    (missing required ctor option), `NegativeCacheDurationException`
-    (value out of range), `NegativeLeewayException` (value out of range).
-  - `\RuntimeException` family — `CacheException` (PSR-6 layer),
-    `HttpException` (transport + PSR-18 `ClientExceptionInterface`),
-    `JsonException` (parse failure), `DecodeException` (JWK base64
-    bytes), `JwksException` (JWKS structure), `CodeException` (token
-    exchange), `ValidationException` (JWT signature/decode),
-    `ClaimsException` (claim values), `MetadataException` (discovery
-    doc structure).
+- Reworked exception hierarchy around the new
+  `OpenIdConnectExceptionInterface` marker. Concrete exception classes now extend the
+  SPL type that best describes the failure category (`\RuntimeException`,
+  `\LogicException`, `\InvalidArgumentException`) instead of the abstract
+  `ItkOpenIdConnectException`. Existing `catch (ItkOpenIdConnectException $e)` blocks
+  will not match anything thrown by 5.0+ code — catch the marker, or scope to a more
+  specific concrete / SPL parent
+- Renamed `KeyException` → `JwksException` for symmetry with the new
+  `MetadataException` and to better describe its scope (the type fires for both
+  JWKS-document-level and JWK-entry-level errors)
+- `OpenIdConfigurationProvider::__construct` now throws the typed
+  `ConfigurationException` (still extending `\InvalidArgumentException`) instead of
+  a raw `\InvalidArgumentException` for missing required options
+- New typed throws replace 4.x silent coercions: malformed JWKS payload
+  (missing `keys` array, non-object JWK entry, missing/non-string `kid` /
+  `kty` / RSA `e` / `n`, unsupported `kty`) → `JwksException`; malformed
+  OIDC discovery document → `MetadataException`; token endpoint response
+  missing string `id_token` → `CodeException`
+- `OpenIdConfigurationProvider::getIdToken` narrowed its boundary `catch` from
+  `\Exception` to the three actually-thrown families
+  (`IdentityProviderException|ClientExceptionInterface|\JsonException`).
+  Exceptions from the upstream `getConfiguration('token_endpoint')` call
+  (`CacheException`, `HttpException`, `MetadataException`, library
+  `JsonException`) now propagate as themselves rather than being re-wrapped
+  as `CodeException`
 
 ### Added
 
-- `ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface`
-  marker for catching every OIDC failure from this library.
-- `ItkDev\OpenIdConnect\Exception\ConfigurationException` for missing
-  or invalid constructor options.
-- `ItkDev\OpenIdConnect\Exception\MetadataException` (extends
-  `\RuntimeException`, implements the marker) for IdP-returned OIDC
-  discovery documents that parse as JSON but don't conform to the
-  OIDC Discovery spec (missing required key, wrong type at a required
-  key). Distinct from `JsonException` (parse failure) and
-  `CacheException` (PSR-6 cache layer failure) — different remediation
-  paths (retry doesn't help; the IdP needs to fix its payload).
-- `tests/Exception/ExceptionHierarchyTest.php` locks the contract:
-  every concrete implements the marker, extends the correct SPL parent,
-  and is caught by a `catch (OpenIdConnectExceptionInterface $e)`
-  block. Failing this test class is the early warning that the public
-  contract has drifted.
+- Marker interface `OpenIdConnectExceptionInterface` (extends `\Throwable`)
+- Concrete exceptions `ConfigurationException` and `MetadataException`
+- `tests/Exception/ExceptionHierarchyTest.php` locks the contract: every concrete
+  implements the marker, extends the correct SPL parent, and is caught by a single
+  `catch (OpenIdConnectExceptionInterface $e)` block
 
 ### Deprecated
 
-- `ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException` abstract
-  class (catch `OpenIdConnectExceptionInterface` instead). Kept through
-  5.x; removal scheduled for 6.0.
+- Abstract `ItkOpenIdConnectException` — catch `OpenIdConnectExceptionInterface`
+  instead. Kept through 5.x as a documented alias that still implements the marker;
+  removal scheduled for 6.0
+
+### Documentation
+
+- Added an "Exception handling" section to `README.md` covering the marker
+  interface, SPL parents, PSR-18 co-implementation on `HttpException`, and the
+  4.x → 5.0 catch-block migration
+- Class-level PHPDoc on every concrete exception describing its trigger sites and
+  the boundary against related types
 
 ### Tooling
 
-- Bumped PHPStan from `level: 8` to `level: max` in `phpstan.neon`.
-  The preceding PRs in the 5.0 series (constructor option shapes,
-  JSON-payload narrowing, claim shape on `validateIdToken`, JWKS
-  validation, test-side Mockery / fixture / claim narrowings) cleared
-  every max-level error; the bump is the final one-line config
-  change that locks in the strictest analysis level for future
-  contributions.
-- `OpenIdConfigurationProvider::__construct` now declares an
-  `array{cacheItemPool?: CacheItemPoolInterface,
-  openIDConnectMetadataUrl?: string, cacheDuration?: int, leeway?: int,
-  allowHttp?: bool, ...}` PHPDoc shape for the `$options` parameter
-  (plus a corresponding shape on `$collaborators` for the `jwt` /
-  `httpClient` keys). PHPStan can now narrow each setter argument to
-  the expected type instead of seeing `mixed`. Behaviour unchanged —
-  removes 4 errors when running PHPStan at `level: max`. Also drops a
-  now-redundant `is_int($options['leeway'])` runtime check that
-  became a `function.alreadyNarrowedType` tautology once the shape
-  was in place (PHP itself enforces the `int` via the `setLeeway`
-  signature under `declare(strict_types=1)`).
-- Collapsed multi-line `@param` / `@return` descriptions in
-  `OpenIdConfigurationProvider` and the test suite onto single
-  lines. `phpdoc_align: vertical` (the @Symfony preset default)
-  doesn't *create* the wraps — it just aligns whatever multi-line
-  structure already exists in the source, so a one-time manual
-  flatten gives the cleaner format and Symfony's vertical
-  alignment then pads description columns into a tidy table:
-
-      * @param string|null $postLogoutRedirectUri The URL …
-      * @param string|null $state                 If a state …
-      * @param string|null $idToken               The id token
-
-  Future docblocks added with everything on one line stay that
-  way under the same alignment rule.
-- PHPStan now scans `tests/` in addition to `src/` at level 8, with
-  `reportIgnoresWithoutComments: true` so unexplained
-  `@phpstan-ignore` directives fail CI.
-- Added `phpstan/phpstan-mockery` to `require-dev` for stubs covering
-  Mockery's fluent `shouldReceive(...)->andReturn(...)` API.
-- Cleaned the 46 pre-existing level-8 issues in `tests/`: dropped the
-  unused nullable from `$this->provider`, narrowed `validateIdToken`
-  claim accesses with `object{nonce, aud}` `@var` shapes, replaced
-  silent `(string)` coercion of `file_get_contents` / `parse_url`
-  failures with `assertNotFalse` / `assertIsString` boundary guards,
-  swapped `assertTrue(true)` tautologies for
-  `expectNotToPerformAssertions`, and replaced the constant-folded
-  `is_subclass_of` marker check with a `ReflectionClass` lookup so
-  PHPStan can't fold it into a tautology. `phpstan-baseline.neon`
-  consequently shrinks to zero and is deleted.
+- PHPStan bumped to `level: max` (was 8). Scans `src/` + `tests/`
+- `reportIgnoresWithoutComments: true` so unexplained `@phpstan-ignore` directives
+  fail CI
+- Added `phpstan/phpstan-mockery` to `require-dev` for stubs covering Mockery's
+  fluent `shouldReceive(...)->andReturn(...)` API
 
 ## [4.1.2] - 2026-05-11
 
@@ -347,7 +227,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.2...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/5.0.0...HEAD
+[5.0.0]: https://github.com/itk-dev/openid-connect/compare/4.1.2...5.0.0
 [4.1.2]: https://github.com/itk-dev/openid-connect/compare/4.1.1...4.1.2
 [4.1.1]: https://github.com/itk-dev/openid-connect/compare/4.1.0...4.1.1
 [4.1.0]: https://github.com/itk-dev/openid-connect/compare/4.0.3...4.1.0
