@@ -154,6 +154,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   became a `function.alreadyNarrowedType` tautology once the shape
   was in place (PHP itself enforces the `int` via the `setLeeway`
   signature under `declare(strict_types=1)`).
+- Collapsed multi-line `@param` / `@return` descriptions in
+  `OpenIdConfigurationProvider` and the test suite onto single
+  lines. `phpdoc_align: vertical` (the @Symfony preset default)
+  doesn't *create* the wraps — it just aligns whatever multi-line
+  structure already exists in the source, so a one-time manual
+  flatten gives the cleaner format and Symfony's vertical
+  alignment then pads description columns into a tidy table:
+
+      * @param string|null $postLogoutRedirectUri The URL …
+      * @param string|null $state                 If a state …
+      * @param string|null $idToken               The id token
+
+  Future docblocks added with everything on one line stay that
+  way under the same alignment rule.
 - PHPStan now scans `tests/` in addition to `src/` at level 8, with
   `reportIgnoresWithoutComments: true` so unexplained
   `@phpstan-ignore` directives fail CI.

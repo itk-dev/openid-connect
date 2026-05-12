@@ -1073,8 +1073,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     /**
      * Get a mock success response with mock date.
      *
-     * @return ResponseInterface
-     *                           A success ("200") response with mock body data
+     * @return ResponseInterface A success ("200") response with mock body data
      */
     /**
      * Load a JSON fixture from tests/MockData and decode it as an associative

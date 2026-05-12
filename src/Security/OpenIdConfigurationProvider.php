@@ -169,15 +169,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @see https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-a-sign-out-request
      * @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
      *
-     * @param string|null $postLogoutRedirectUri
-     *                                           The URL that the user should be redirected to after successful sign out
-     * @param string|null $state
-     *                                           If a state parameter is included in the request, the same value should appear in the response. The application should verify that the state values in the request and response are identical.
-     * @param string|null $idToken
-     *                                           The id token
+     * @param string|null $postLogoutRedirectUri The URL that the user should be redirected to after successful sign out
+     * @param string|null $state                 If a state parameter is included in the request, the same value should appear in the response. The application should verify that the state values in the request and response are identical.
+     * @param string|null $idToken               The id token
      *
-     * @return string
-     *                The Url to redirect the client to for session logout
+     * @return string The Url to redirect the client to for session logout
      *
      * @throws CacheException
      * @throws HttpException
@@ -220,13 +216,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * processes), the leeway value set by the last provider to call validateIdToken()
      * will apply globally until overwritten.
      *
-     * @param string $idToken
-     *                        Raw id token
-     * @param string $nonce
-     *                        Nonce
+     * @param string $idToken Raw id token
+     * @param string $nonce   Nonce
      *
-     * @return object
-     *                The JWT's payload as a PHP object
+     * @return object The JWT's payload as a PHP object
      *
      * @throws CacheException
      * @throws ClaimsException
@@ -268,11 +261,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Get id token from code.
      *
-     * @param string $code
-     *                     The code
+     * @param string $code The code
      *
-     * @return string
-     *                The ID token
+     * @return string The ID token
      *
      * @throws OpenIdConnectExceptionInterface
      */
@@ -310,11 +301,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the state parameter in an
      * authorization flow.
      *
-     * @param int $length
-     *                    Length of the random string to be generated
+     * @param int $length Length of the random string to be generated
      *
-     * @return string
-     *                The generated state
+     * @return string The generated state
      */
     public function generateState(int $length = 32): string
     {
@@ -327,11 +316,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the nonce parameter in an
      * authorization flow.
      *
-     * @param int $length
-     *                    Length of the random string to be generated
+     * @param int $length Length of the random string to be generated
      *
-     * @return string
-     *                The generated nonce
+     * @return string The generated nonce
      */
     public function generateNonce(int $length = 32): string
     {
@@ -379,8 +366,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Get JWT verification keys from Azure Active Directory.
      *
-     * @return array<string, Key>
-     *                            Array of keys indexed by JWK `kid`
+     * @return array<string, Key> Array of keys indexed by JWK `kid`
      *
      * @throws OpenIdConnectExceptionInterface
      */
@@ -459,8 +445,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Fetch remote json resource.
      *
-     * @return array
-     *               Json decoded to array
+     * @return array Json decoded to array
      *
      * @throws HttpException
      * @throws JsonException
@@ -490,11 +475,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Get Configuration option for key.
      *
-     * @param string $key
-     *                    The configuration key
+     * @param string $key The configuration key
      *
-     * @return string
-     *                The configuration value for the given key
+     * @return string The configuration value for the given key
      *
      * @throws CacheException
      * @throws HttpException
@@ -550,8 +533,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set the provider cache duration.
      *
-     * @param int $cacheDuration
-     *                           The cache duration in seconds
+     * @param int $cacheDuration The cache duration in seconds
      *
      * @throws NegativeCacheDurationException
      */
@@ -566,8 +548,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set the leeway to allow for clock skew between hosting server and provider.
      *
-     * @param int $leeway
-     *                    The leeway in seconds. Must be positive
+     * @param int $leeway The leeway in seconds. Must be positive
      *
      * @throws NegativeLeewayException
      */
@@ -582,8 +563,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set allow HTTP.
      *
-     * @param bool $allowHttp
-     *                        Whether to allow HTTP
+     * @param bool $allowHttp Whether to allow HTTP
      */
     private function setAllowHttp(bool $allowHttp): void
     {
