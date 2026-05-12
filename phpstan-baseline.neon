@@ -55,72 +55,6 @@ parameters:
 			path: tests/Security/OpenIdConfigurationProviderTest.php
 
 		-
-			message: '#^Cannot call method generateNonce\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method generateState\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getAuthorizationUrl\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 3
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getBaseAccessTokenUrl\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getBaseAuthorizationUrl\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getDefaultScopes\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getEndSessionUrl\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 6
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getGuarded\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getResourceOwnerDetailsUrl\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method getState\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Cannot call method validateIdToken\(\) on ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\.$#'
-			identifier: method.nonObject
-			count: 7
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
 			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#'
 			identifier: argument.type
 			count: 3
@@ -129,11 +63,5 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$string of function parse_str expects string, string\|false\|null given\.$#'
 			identifier: argument.type
-			count: 1
-			path: tests/Security/OpenIdConfigurationProviderTest.php
-
-		-
-			message: '#^Property Tests\\Security\\OpenIdConfigurationProviderTest\:\:\$provider \(ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider\|null\) is never assigned null so it can be removed from the property type\.$#'
-			identifier: property.unusedType
 			count: 1
 			path: tests/Security/OpenIdConfigurationProviderTest.php

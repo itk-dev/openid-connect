@@ -37,7 +37,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     private const REDIRECT_URI = 'https://redirect.url';
     private const NONCE = '12345678';
 
-    private ?OpenIdConfigurationProvider $provider;
+    private OpenIdConfigurationProvider $provider;
 
     public function setUp(): void
     {
