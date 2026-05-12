@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-wrapped as `CodeException`. Both implement the marker, so a
   consumer catching that is unaffected; a consumer catching only
   `CodeException` will need to widen to the marker for this code path.
+- `OpenIdConfigurationProvider` now throws `KeyException` when a JWK
+  entry is missing a string `kid` (RFC 7517 §4.5), and `CacheException`
+  when an OIDC discovery document returns a non-string value for a
+  required key. Previously these were silently coerced to strings via
+  `(string)` casts and produced confusing downstream failures. The new
+  thrown types both implement the marker interface, so consumers
+  catching that are unaffected.
 
 ### Added
 

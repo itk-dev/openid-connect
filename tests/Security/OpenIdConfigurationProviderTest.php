@@ -581,6 +581,32 @@ class OpenIdConfigurationProviderTest extends TestCase
         $method->invoke($this->provider, 'nonexistent_key');
     }
 
+    public function testGetConfigurationNonStringValue(): void
+    {
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(true);
+        $mockCacheItem->method('get')->willReturn(['authorization_endpoint' => 42]);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $this->createStub(ClientInterface::class),
+        ]);
+
+        $this->expectException(CacheException::class);
+        $this->expectExceptionMessage('OIDC discovery document value for "authorization_endpoint" is not a string (got int)');
+
+        $method = new \ReflectionMethod(OpenIdConfigurationProvider::class, 'getConfiguration');
+        $method->invoke($provider, 'authorization_endpoint');
+    }
+
     public function testFetchJsonResourceNon200(): void
     {
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
@@ -681,6 +707,52 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->expectException(\ItkDev\OpenIdConnect\Exception\JsonException::class);
 
         $provider->getBaseAuthorizationUrl();
+    }
+
+    public function testGetJwtVerificationKeysRejectsNonStringKid(): void
+    {
+        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
+
+        $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
+
+        // JWK with an int `kid` — violates RFC 7517 §4.5 (kid must be a string).
+        $badJwks = json_encode(['keys' => [['kid' => 42, 'kty' => 'RSA', 'e' => 'AQAB', 'n' => 'abc']]]);
+        $mockKeysStream = $this->createStub(StreamInterface::class);
+        $mockKeysStream->method('getContents')->willReturn($badJwks);
+
+        $mockKeysResponse = $this->createStub(ResponseInterface::class);
+        $mockKeysResponse->method('getStatusCode')->willReturn(200);
+        $mockKeysResponse->method('getBody')->willReturn($mockKeysStream);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturnMap([
+            ['GET', $openIDConnectMetadataUrl, [], $mockConfigResponse],
+            ['GET', $jwks_uri, [], $mockKeysResponse],
+        ]);
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+
+        $this->expectException(KeyException::class);
+        $this->expectExceptionMessage('JWK entry missing string "kid" (RFC 7517 §4.5)');
+
+        $provider->validateIdToken('token', self::NONCE);
     }
 
     public function testGetJwtVerificationKeysUnsupportedKeyType(): void

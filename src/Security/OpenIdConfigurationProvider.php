@@ -370,7 +370,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $jwks = $this->fetchJsonResource($keysUri);
 
                 foreach ($jwks['keys'] as $key) {
-                    $kid = (string) $key['kid'];
+                    if (!is_string($key['kid'] ?? null)) {
+                        throw new KeyException('JWK entry missing string "kid" (RFC 7517 §4.5)');
+                    }
+                    $kid = $key['kid'];
                     if ('RSA' === $key['kty']) {
                         $e = self::base64urlDecode($key['e']);
                         $n = self::base64urlDecode($key['n']);
@@ -468,13 +471,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $this->cacheItemPool->save($item);
             }
 
-            if (isset($configuration[$key])) {
-                $value = (string) $configuration[$key];
-            } else {
+            if (!isset($configuration[$key])) {
                 throw new CacheException('Required config key not defined: '.$key);
             }
+            if (!is_string($configuration[$key])) {
+                throw new CacheException(sprintf('OIDC discovery document value for "%s" is not a string (got %s)', $key, get_debug_type($configuration[$key])));
+            }
 
-            return $value;
+            return $configuration[$key];
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage(), 0, $e);
         }
