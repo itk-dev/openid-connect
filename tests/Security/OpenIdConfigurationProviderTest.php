@@ -12,7 +12,7 @@ use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\CodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
-use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\JwksException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
@@ -766,7 +766,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks((string) json_encode(['something_else' => 1]));
         \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
-        $this->expectException(KeyException::class);
+        $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWKS payload missing array "keys" property (RFC 7517 §5)');
 
         $provider->validateIdToken('token', self::NONCE);
@@ -777,7 +777,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks((string) json_encode(['keys' => [42]]));
         \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
-        $this->expectException(KeyException::class);
+        $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry is not a JSON object');
 
         $provider->validateIdToken('token', self::NONCE);
@@ -790,7 +790,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         );
         \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
-        $this->expectException(KeyException::class);
+        $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry missing string "kty" for key id: key-1');
 
         $provider->validateIdToken('token', self::NONCE);
@@ -803,7 +803,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         );
         \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
-        $this->expectException(KeyException::class);
+        $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK RSA entry missing string "e"/"n" for key id: key-1');
 
         $provider->validateIdToken('token', self::NONCE);
@@ -849,7 +849,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
-        $this->expectException(KeyException::class);
+        $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry missing string "kid" (RFC 7517 §4.5)');
 
         $provider->validateIdToken('token', self::NONCE);
@@ -894,7 +894,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
 
-        $this->expectException(KeyException::class);
+        $this->expectException(JwksException::class);
         $this->expectExceptionMessage('Unsupported key data for key id: ec-key-1');
 
         $provider->validateIdToken('token', self::NONCE);

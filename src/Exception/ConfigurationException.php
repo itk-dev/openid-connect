@@ -3,10 +3,14 @@
 namespace ItkDev\OpenIdConnect\Exception;
 
 /**
- * Thrown when the bundle is misconfigured (missing required constructor option, invalid value, etc).
+ * Thrown from the `OpenIdConfigurationProvider` constructor when a required
+ * option (`cacheItemPool`, `openIDConnectMetadataUrl`) is missing from the
+ * `$options` array. Invalid input to a public constructor — fixable in
+ * calling code only. Hence `\InvalidArgumentException`.
  *
- * Extends `\InvalidArgumentException` because the failure is invalid input to a public constructor;
- * fixable in calling code, not at runtime.
+ * Distinct from {@see NegativeCacheDurationException} and
+ * {@see NegativeLeewayException}, which fire when a numeric option is
+ * present but out of range.
  */
 class ConfigurationException extends \InvalidArgumentException implements OpenIdConnectExceptionInterface
 {

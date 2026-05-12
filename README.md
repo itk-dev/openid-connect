@@ -218,7 +218,7 @@ category, so a `catch` block scoped to that SPL type will also match:
 
 | SPL parent | Concrete types | Category |
 | ---------- | -------------- | -------- |
-| `\RuntimeException` | `CacheException`, `HttpException`, `JsonException`, `DecodeException`, `KeyException`, `CodeException`, `ValidationException`, `ClaimsException`, `MetadataException` | Network, cache, token validation, claims mismatch — transient or data-shape failures |
+| `\RuntimeException` | `CacheException`, `HttpException`, `JsonException`, `DecodeException`, `JwksException`, `CodeException`, `ValidationException`, `ClaimsException`, `MetadataException` | Network, cache, token validation, claims mismatch — transient or data-shape failures |
 | `\LogicException` | `BadUrlException`, `IllegalSchemeException`, `MissingParameterException` | Programmer/config bugs — should be fixed in code |
 | `\InvalidArgumentException` | `ConfigurationException`, `NegativeCacheDurationException`, `NegativeLeewayException` | Invalid input to the constructor / setters |
 
