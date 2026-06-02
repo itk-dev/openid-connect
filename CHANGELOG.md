@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [5.0.0] - 2026-05-12
+## [5.0.0] - 2026-06-02
 
 Reworked exception hierarchy and tightened IdP-payload validations. The runtime
 behaviour is unchanged for spec-compliant IdPs — see [UPGRADE-5.0.md](UPGRADE-5.0.md)
