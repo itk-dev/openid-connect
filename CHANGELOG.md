@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-06-02
+
+Reworked exception hierarchy and tightened IdP-payload validations. The runtime
+behaviour is unchanged for spec-compliant IdPs — see [UPGRADE-5.0.md](UPGRADE-5.0.md)
+for the consumer migration guide.
+
+### Changed (BREAKING)
+
+- Reworked exception hierarchy around the new
+  `OpenIdConnectExceptionInterface` marker. Concrete exception classes now extend the
+  SPL type that best describes the failure category (`\RuntimeException`,
+  `\LogicException`, `\InvalidArgumentException`) instead of the abstract
+  `ItkOpenIdConnectException`. Existing `catch (ItkOpenIdConnectException $e)` blocks
+  will not match anything thrown by 5.0+ code — catch the marker, or scope to a more
+  specific concrete / SPL parent
+- Renamed `KeyException` → `JwksException` for symmetry with the new
+  `MetadataException` and to better describe its scope (the type fires for both
+  JWKS-document-level and JWK-entry-level errors)
+- `OpenIdConfigurationProvider::__construct` now throws the typed
+  `ConfigurationException` (still extending `\InvalidArgumentException`) instead of
+  a raw `\InvalidArgumentException` for missing required options
+- New typed throws replace 4.x silent coercions: malformed JWKS payload
+  (missing `keys` array, non-object JWK entry, missing/non-string `kid` /
+  `kty` / RSA `e` / `n`, unsupported `kty`) → `JwksException`; malformed
+  OIDC discovery document → `MetadataException`; token endpoint response
+  missing string `id_token` → `CodeException`
+- `OpenIdConfigurationProvider::getIdToken` narrowed its boundary `catch` from
+  `\Exception` to the three actually-thrown families
+  (`IdentityProviderException|ClientExceptionInterface|\JsonException`).
+  Exceptions from the upstream `getConfiguration('token_endpoint')` call
+  (`CacheException`, `HttpException`, `MetadataException`, library
+  `JsonException`) now propagate as themselves rather than being re-wrapped
+  as `CodeException`
+
+### Added
+
+- Marker interface `OpenIdConnectExceptionInterface` (extends `\Throwable`)
+- Concrete exceptions `ConfigurationException` and `MetadataException`
+- `tests/Exception/ExceptionHierarchyTest.php` locks the contract: every concrete
+  implements the marker, extends the correct SPL parent, and is caught by a single
+  `catch (OpenIdConnectExceptionInterface $e)` block
+
+### Deprecated
+
+- Abstract `ItkOpenIdConnectException` — catch `OpenIdConnectExceptionInterface`
+  instead. Kept through 5.x as a documented alias that still implements the marker;
+  removal scheduled for 6.0
+
+### Documentation
+
+- Added an "Exception handling" section to `README.md` covering the marker
+  interface, SPL parents, PSR-18 co-implementation on `HttpException`, and the
+  4.x → 5.0 catch-block migration
+- Class-level PHPDoc on every concrete exception describing its trigger sites and
+  the boundary against related types
+
+### Tooling
+
+- PHPStan bumped to `level: max` (was 8). Scans `src/` + `tests/`
+- `reportIgnoresWithoutComments: true` so unexplained `@phpstan-ignore` directives
+  fail CI
+- Added `phpstan/phpstan-mockery` to `require-dev` for stubs covering Mockery's
+  fluent `shouldReceive(...)->andReturn(...)` API
+
 ## [4.1.2] - 2026-05-11
 
 - Chained `previous` consistently in `OpenIdConfigurationProvider` catch
@@ -163,7 +227,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/4.1.2...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/5.0.0...HEAD
+[5.0.0]: https://github.com/itk-dev/openid-connect/compare/4.1.2...5.0.0
 [4.1.2]: https://github.com/itk-dev/openid-connect/compare/4.1.1...4.1.2
 [4.1.1]: https://github.com/itk-dev/openid-connect/compare/4.1.0...4.1.1
 [4.1.0]: https://github.com/itk-dev/openid-connect/compare/4.0.3...4.1.0

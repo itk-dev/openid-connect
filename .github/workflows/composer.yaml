@@ -77,4 +77,5 @@ jobs:
                   docker network create frontend
 
             - run: |
+                  docker compose run --rm phpfpm composer install
                   docker compose run --rm phpfpm composer audit

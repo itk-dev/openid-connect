@@ -10,15 +10,17 @@ use ItkDev\OpenIdConnect\Exception\BadUrlException;
 use ItkDev\OpenIdConnect\Exception\CacheException;
 use ItkDev\OpenIdConnect\Exception\ClaimsException;
 use ItkDev\OpenIdConnect\Exception\CodeException;
+use ItkDev\OpenIdConnect\Exception\ConfigurationException;
 use ItkDev\OpenIdConnect\Exception\DecodeException;
 use ItkDev\OpenIdConnect\Exception\HttpException;
 use ItkDev\OpenIdConnect\Exception\IllegalSchemeException;
-use ItkDev\OpenIdConnect\Exception\ItkOpenIdConnectException;
 use ItkDev\OpenIdConnect\Exception\JsonException;
-use ItkDev\OpenIdConnect\Exception\KeyException;
+use ItkDev\OpenIdConnect\Exception\JwksException;
+use ItkDev\OpenIdConnect\Exception\MetadataException;
 use ItkDev\OpenIdConnect\Exception\MissingParameterException;
 use ItkDev\OpenIdConnect\Exception\NegativeCacheDurationException;
 use ItkDev\OpenIdConnect\Exception\NegativeLeewayException;
+use ItkDev\OpenIdConnect\Exception\OpenIdConnectExceptionInterface;
 use ItkDev\OpenIdConnect\Exception\ValidationException;
 use League\OAuth2\Client\Provider\AbstractProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
@@ -64,14 +66,36 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * OpenIdConfigurationProvider constructor.
      *
-     * @throws ItkOpenIdConnectException
+     * The two well-typed keys (`cacheItemPool`, `openIDConnectMetadataUrl`)
+     * are marked optional in the array shape because the runtime check
+     * throws `ConfigurationException` if they are missing — but their type
+     * is narrowed when present so the downstream setters keep their typed
+     * arguments. Extra keys (league/oauth2-client's `clientId`,
+     * `clientSecret`, `redirectUri`, … and Guzzle's `timeout` / `proxy` /
+     * `verify`) are accepted via `...`.
+     *
+     * @param array{
+     *     cacheItemPool?: CacheItemPoolInterface,
+     *     openIDConnectMetadataUrl?: string,
+     *     cacheDuration?: int,
+     *     leeway?: int,
+     *     allowHttp?: bool,
+     *     ...
+     * } $options
+     * @param array{
+     *     jwt?: \League\OAuth2\Client\Tool\RequestFactory,
+     *     httpClient?: \GuzzleHttp\ClientInterface,
+     *     ...
+     * } $collaborators
+     *
+     * @throws OpenIdConnectExceptionInterface
      */
     public function __construct(array $options = [], array $collaborators = [])
     {
         parent::__construct($options, $collaborators);
 
         if (!array_key_exists('cacheItemPool', $options)) {
-            throw new \InvalidArgumentException('Required options not defined: cacheItemPool');
+            throw new ConfigurationException('Required options not defined: cacheItemPool');
         }
         $this->setCacheItemPool($options['cacheItemPool']);
 
@@ -79,12 +103,12 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $this->setCacheDuration($options['cacheDuration']);
         }
 
-        if (array_key_exists('leeway', $options) && is_int($options['leeway'])) {
+        if (array_key_exists('leeway', $options)) {
             $this->setLeeway($options['leeway']);
         }
 
         if (!array_key_exists('openIDConnectMetadataUrl', $options)) {
-            throw new \InvalidArgumentException('Required options not defined: openIDConnectMetadataUrl');
+            throw new ConfigurationException('Required options not defined: openIDConnectMetadataUrl');
         }
 
         if (empty($collaborators['jwt'])) {
@@ -107,6 +131,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     public function getBaseAuthorizationUrl(): string
     {
@@ -114,7 +139,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
-     * @throws ItkOpenIdConnectException
+     * @throws OpenIdConnectExceptionInterface
      */
     public function getAuthorizationUrl(array $options = []): string
     {
@@ -144,19 +169,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @see https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-a-sign-out-request
      * @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
      *
-     * @param string|null $postLogoutRedirectUri
-     *                                           The URL that the user should be redirected to after successful sign out
-     * @param string|null $state
-     *                                           If a state parameter is included in the request, the same value should appear in the response. The application should verify that the state values in the request and response are identical.
-     * @param string|null $idToken
-     *                                           The id token
+     * @param string|null $postLogoutRedirectUri The URL that the user should be redirected to after successful sign out
+     * @param string|null $state                 If a state parameter is included in the request, the same value should appear in the response. The application should verify that the state values in the request and response are identical.
+     * @param string|null $idToken               The id token
      *
-     * @return string
-     *                The Url to redirect the client to for session logout
+     * @return string The Url to redirect the client to for session logout
      *
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     public function getEndSessionUrl(?string $postLogoutRedirectUri = null, ?string $state = null, ?string $idToken = null): string
     {
@@ -194,20 +216,18 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * processes), the leeway value set by the last provider to call validateIdToken()
      * will apply globally until overwritten.
      *
-     * @param string $idToken
-     *                        Raw id token
-     * @param string $nonce
-     *                        Nonce
+     * @param string $idToken Raw id token
+     * @param string $nonce   Nonce
      *
-     * @return object
-     *                The JWT's payload as a PHP object
+     * @return object The JWT's payload as a PHP object
      *
      * @throws CacheException
      * @throws ClaimsException
      * @throws DecodeException
      * @throws HttpException
      * @throws JsonException
-     * @throws KeyException
+     * @throws JwksException
+     * @throws MetadataException
      * @throws ValidationException
      */
     public function validateIdToken(string $idToken, string $nonce): object
@@ -217,6 +237,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
             // NB: JWT::$leeway is a static property shared across all instances.
             // Always set it immediately before decode to ensure the correct value.
             JWT::$leeway = $this->leeway;
+            /** @var \stdClass&object{aud: string|array<string>, iss: string, nonce: string} $claims */
             $claims = JWT::decode($idToken, $keys);
             // "aud" may be an array of strings or a single string
             // (cf. https://openid.net/specs/openid-connect-core-1_0.html#IDToken).
@@ -240,13 +261,11 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Get id token from code.
      *
-     * @param string $code
-     *                     The code
+     * @param string $code The code
      *
-     * @return string
-     *                The ID token
+     * @return string The ID token
      *
-     * @throws CodeException Wraps any \Exception thrown by token-endpoint HTTP, JSON parsing, or `getConfiguration()` (with `previous` chained)
+     * @throws OpenIdConnectExceptionInterface
      */
     public function getIdToken(string $code): string
     {
@@ -264,8 +283,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
 
             $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
+            if (!is_array($payload) || !is_string($payload['id_token'] ?? null)) {
+                throw new CodeException('Token endpoint response missing string "id_token"');
+            }
+
             return $payload['id_token'];
-        } catch (\Exception $e) {
+        } catch (IdentityProviderException|ClientExceptionInterface|\JsonException $e) {
+            // Narrow boundary: IdentityProviderException from league's checkResponse,
+            // ClientExceptionInterface from Guzzle, \JsonException from json_decode.
+            // Other failures (e.g. CacheException from getConfiguration) propagate
+            // as their own concrete OpenIdConnectExceptionInterface subtypes.
             throw new CodeException('Get ID token failed: '.$e->getMessage(), 0, $e);
         }
     }
@@ -274,11 +301,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the state parameter in an
      * authorization flow.
      *
-     * @param int $length
-     *                    Length of the random string to be generated
+     * @param int $length Length of the random string to be generated
      *
-     * @return string
-     *                The generated state
+     * @return string The generated state
      */
     public function generateState(int $length = 32): string
     {
@@ -291,11 +316,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the nonce parameter in an
      * authorization flow.
      *
-     * @param int $length
-     *                    Length of the random string to be generated
+     * @param int $length Length of the random string to be generated
      *
-     * @return string
-     *                The generated nonce
+     * @return string The generated nonce
      */
     public function generateNonce(int $length = 32): string
     {
@@ -343,10 +366,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Get JWT verification keys from Azure Active Directory.
      *
-     * @return array
-     *               Array of keys
+     * @return array<string, Key> Array of keys indexed by JWK `kid`
      *
-     * @throws ItkOpenIdConnectException
+     * @throws OpenIdConnectExceptionInterface
      */
     private function getJwtVerificationKeys(): array
     {
@@ -359,20 +381,37 @@ class OpenIdConfigurationProvider extends AbstractProvider
             $item = $this->cacheItemPool->getItem($cacheKey);
 
             if ($item->isHit()) {
+                /** @var array<string, Key> $keys (we only ever store this shape) */
                 $keys = (array) $item->get();
             } else {
                 $keysUri = $this->getConfiguration('jwks_uri');
                 $jwks = $this->fetchJsonResource($keysUri);
 
+                if (!isset($jwks['keys']) || !is_array($jwks['keys'])) {
+                    throw new JwksException('JWKS payload missing array "keys" property (RFC 7517 §5)');
+                }
+
                 foreach ($jwks['keys'] as $key) {
-                    $kid = (string) $key['kid'];
+                    if (!is_array($key)) {
+                        throw new JwksException('JWK entry is not a JSON object');
+                    }
+                    if (!is_string($key['kid'] ?? null)) {
+                        throw new JwksException('JWK entry missing string "kid" (RFC 7517 §4.5)');
+                    }
+                    $kid = $key['kid'];
+                    if (!is_string($key['kty'] ?? null)) {
+                        throw new JwksException('JWK entry missing string "kty" for key id: '.$kid);
+                    }
                     if ('RSA' === $key['kty']) {
+                        if (!is_string($key['e'] ?? null) || !is_string($key['n'] ?? null)) {
+                            throw new JwksException('JWK RSA entry missing string "e"/"n" for key id: '.$kid);
+                        }
                         $e = self::base64urlDecode($key['e']);
                         $n = self::base64urlDecode($key['n']);
                         $publicKey = XMLSecurityKey::convertRSA($n, $e);
                         $keys[$kid] = new Key($publicKey, 'RS256');
                     } else {
-                        throw new KeyException('Unsupported key data for key id: '.$kid);
+                        throw new JwksException('Unsupported key data for key id: '.$kid);
                     }
                 }
 
@@ -406,8 +445,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Fetch remote json resource.
      *
-     * @return array
-     *               Json decoded to array
+     * @return array Json decoded to array
      *
      * @throws HttpException
      * @throws JsonException
@@ -437,15 +475,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Get Configuration option for key.
      *
-     * @param string $key
-     *                    The configuration key
+     * @param string $key The configuration key
      *
-     * @return string
-     *                The configuration value for the given key
+     * @return string The configuration value for the given key
      *
      * @throws CacheException
      * @throws HttpException
      * @throws JsonException
+     * @throws MetadataException
      */
     private function getConfiguration(string $key): string
     {
@@ -463,13 +500,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 $this->cacheItemPool->save($item);
             }
 
-            if (isset($configuration[$key])) {
-                $value = (string) $configuration[$key];
-            } else {
-                throw new CacheException('Required config key not defined: '.$key);
+            if (!isset($configuration[$key])) {
+                throw new MetadataException('OIDC discovery document missing required key: '.$key);
+            }
+            if (!is_string($configuration[$key])) {
+                throw new MetadataException(sprintf('OIDC discovery document value for "%s" is not a string (got %s)', $key, get_debug_type($configuration[$key])));
             }
 
-            return $value;
+            return $configuration[$key];
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage(), 0, $e);
         }
@@ -495,8 +533,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set the provider cache duration.
      *
-     * @param int $cacheDuration
-     *                           The cache duration in seconds
+     * @param int $cacheDuration The cache duration in seconds
      *
      * @throws NegativeCacheDurationException
      */
@@ -511,8 +548,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set the leeway to allow for clock skew between hosting server and provider.
      *
-     * @param int $leeway
-     *                    The leeway in seconds. Must be positive
+     * @param int $leeway The leeway in seconds. Must be positive
      *
      * @throws NegativeLeewayException
      */
@@ -527,8 +563,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set allow HTTP.
      *
-     * @param bool $allowHttp
-     *                        Whether to allow HTTP
+     * @param bool $allowHttp Whether to allow HTTP
      */
     private function setAllowHttp(bool $allowHttp): void
     {
@@ -538,7 +573,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Set the OpenID Connect Metadata Url.
      *
-     * @throws ItkOpenIdConnectException
+     * @throws OpenIdConnectExceptionInterface
      */
     private function setOpenIDConnectMetadataUrl(string $url): void
     {

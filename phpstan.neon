@@ -1,7 +1,12 @@
+includes:
+	- vendor/phpstan/phpstan-mockery/extension.neon
+
 parameters:
-	level: 8
+	level: max
 	paths:
 		- src
+		- tests
+	reportIgnoresWithoutComments: true
 	ignoreErrors:
 		-
 			identifier: missingType.iterableValue
