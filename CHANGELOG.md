@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Mutation testing with [Infection](https://infection.github.io/)
+  (`task test:mutation`), run in CI and reported to the Stryker dashboard
+  (mutation score badge in README)
+
 ### Changed
 
 - Strengthened exception assertions guided by mutation testing: thrown
