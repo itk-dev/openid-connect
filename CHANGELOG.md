@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Test fixtures and README examples use RFC 2606 reserved domains
+  (`provider.example.org` for IdP-side URLs, `app.example.org` for
+  application-side URLs) instead of invented registrable domains
+
 - Strengthened constructor tests guided by mutation testing: the `jwt`
   collaborator is asserted to become the request factory, and `0` is
   asserted to be an accepted boundary value for `cacheDuration` and
