@@ -66,7 +66,7 @@ require_once __DIR__.'/vendor/autoload.php';
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 
 $provider = new OpenIdConfigurationProvider([
-    'redirectUri' => 'https://some.url', // Absolute url to where the user is redirected after a successful login
+    'redirectUri' => 'https://app.example.org', // Absolute url to where the user is redirected after a successful login
     'openIDConnectMetadataUrl' => 'https:/.../openid-configuration', // url to OpenId Discovery document
     'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Implementation of CacheItemPoolInterface for caching above discovery document
     'clientId' => 'client_id', // Client id assigned by authorizer

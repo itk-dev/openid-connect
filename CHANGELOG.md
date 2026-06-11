@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Strengthened tests guided by mutation testing; mutation score raised to
   93% with a CI threshold of 90 (`minCoveredMsi` in `infection.json5`)
+- Test fixtures and README examples use RFC 2606 reserved domains
+  (`provider.example.org` for IdP-side URLs, `app.example.org` for
+  application-side URLs) instead of invented registrable domains
 
 ## [5.0.0] - 2026-06-02
 

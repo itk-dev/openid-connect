@@ -35,7 +35,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     private const CLIENT_ID = 'test_client_id';
     private const CLIENT_SECRET = 'test_client_secret';
-    private const REDIRECT_URI = 'https://redirect.url';
+    private const REDIRECT_URI = 'https://app.example.org';
     private const NONCE = '12345678';
 
     private OpenIdConfigurationProvider $provider;
@@ -44,7 +44,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         parent::setUp();
 
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -106,7 +106,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheDuration' => -10,
         ], []);
     }
@@ -120,7 +120,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'leeway' => -10,
         ], []);
     }
@@ -133,7 +133,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         // tolerate no clock skew. Only negative values are rejected.
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheDuration' => 0,
             'leeway' => 0,
         ], []);
@@ -148,7 +148,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
         ], [
             'jwt' => $requestFactory,
         ]);
@@ -364,11 +364,11 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
 
         $this->expectException(IllegalSchemeException::class);
-        $this->expectExceptionMessage('OpenIDConnectMetadataUrl must use https: http://some.url/openid-configuration');
+        $this->expectExceptionMessage('OpenIDConnectMetadataUrl must use https: http://provider.example.org/openid-configuration');
 
         new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'http://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'http://provider.example.org/openid-configuration',
         ], []);
     }
 
@@ -383,7 +383,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'http://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'http://provider.example.org/openid-configuration',
             'allowHttp' => true,
             'clientId' => self::CLIENT_ID,
             'clientSecret' => self::CLIENT_SECRET,
@@ -518,7 +518,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetIdTokenSuccess(): void
     {
         $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -568,7 +568,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetIdTokenFailure(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
         // PSR-18 transport stub — Guzzle's real exceptions need a RequestInterface
@@ -608,7 +608,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetIdTokenRejectsInvalidJsonResponse(): void
     {
         $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
 
@@ -663,7 +663,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetIdTokenRejectsResponseWithoutStringIdToken(): void
     {
         $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
 
@@ -726,7 +726,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockHttpClient = $this->createStub(ClientInterface::class);
 
         $provider = new OpenIdConfigurationProvider([
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheItemPool' => $mockCacheItemPool,
             'clientId' => self::CLIENT_ID,
             'clientSecret' => self::CLIENT_SECRET,
@@ -758,7 +758,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
 
         $provider = new OpenIdConfigurationProvider([
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheItemPool' => $mockCacheItemPool,
             'clientId' => self::CLIENT_ID,
             'clientSecret' => self::CLIENT_SECRET,
@@ -776,7 +776,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testFetchJsonResourceNon200(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockStream = $this->createStub(StreamInterface::class);
         $mockStream->method('getContents')->willReturn('');
@@ -805,14 +805,14 @@ class OpenIdConfigurationProviderTest extends TestCase
         ]);
 
         $this->expectException(HttpException::class);
-        $this->expectExceptionMessage('Cannot access json resource: https://some.url/openid-configuration');
+        $this->expectExceptionMessage('Cannot access json resource: https://provider.example.org/openid-configuration');
 
         $provider->getBaseAuthorizationUrl();
     }
 
     public function testFetchJsonResourceClientException(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
         $exception = new class('Connection refused') extends \RuntimeException implements ClientExceptionInterface {
@@ -849,7 +849,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testFetchJsonResourceInvalidJson(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockStream = $this->createStub(StreamInterface::class);
         $mockStream->method('getContents')->willReturn('not valid json{{{');
@@ -938,7 +938,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetJwtVerificationKeysRejectsNonStringKid(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -985,7 +985,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetJwtVerificationKeysUnsupportedKeyType(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -1031,7 +1031,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetJwtVerificationKeysCacheHit(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
@@ -1078,7 +1078,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetConfigurationCachesFetchedDocument(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -1115,7 +1115,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetJwtVerificationKeysCachesFetchedKeys(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
         $mockKeysResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDValidationKeys.json');
@@ -1194,7 +1194,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetConfigurationCacheInvalidArgument(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $exception = new class('Invalid cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException {
         };
@@ -1227,7 +1227,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetJwtVerificationKeysCacheInvalidArgument(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
         $configCacheItem = $this->createStub(CacheItemInterface::class);
@@ -1272,7 +1272,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testBase64urlDecodeFailure(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -1348,7 +1348,7 @@ class OpenIdConfigurationProviderTest extends TestCase
      */
     private function createProviderWithCustomJwks(string $jwksJson): OpenIdConfigurationProvider
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
