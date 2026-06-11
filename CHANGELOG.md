@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Strengthened exception assertions guided by mutation testing: thrown
+  messages are asserted in full (including dynamic parts), wrap-boundary
+  exceptions assert code `0` and the chained `$previous` cause, and
+  invalid JSON from the token endpoint is covered
+
 ## [5.0.0] - 2026-06-02
 
 Reworked exception hierarchy and tightened IdP-payload validations. The runtime
