@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Strengthened cache assertions guided by mutation testing: the discovery
+  document and JWKS key map are asserted to be written to the cache with
+  the configured duration under the namespaced key, and a multi-key JWKS
+  is asserted to reach `JWT::decode` in full
+
 ## [5.0.0] - 2026-06-02
 
 Reworked exception hierarchy and tightened IdP-payload validations. The runtime
