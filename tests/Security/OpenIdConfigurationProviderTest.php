@@ -20,6 +20,7 @@ use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use League\OAuth2\Client\Token\AccessToken;
+use League\OAuth2\Client\Tool\RequestFactory;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
@@ -122,6 +123,40 @@ class OpenIdConfigurationProviderTest extends TestCase
             'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
             'leeway' => -10,
         ], []);
+    }
+
+    public function testConstructZeroCacheDurationAndLeewayAccepted(): void
+    {
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+
+        // Zero is a valid boundary value for both options: cache nothing,
+        // tolerate no clock skew. Only negative values are rejected.
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'cacheDuration' => 0,
+            'leeway' => 0,
+        ], []);
+
+        $this->assertInstanceOf(OpenIdConfigurationProvider::class, $provider);
+    }
+
+    public function testConstructWiresJwtCollaboratorAsRequestFactory(): void
+    {
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $requestFactory = new RequestFactory();
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+        ], [
+            'jwt' => $requestFactory,
+        ]);
+
+        // The 'jwt' collaborator must become the provider's request factory;
+        // without the explicit wiring the parent's default factory would be
+        // silently used instead.
+        $this->assertSame($requestFactory, $provider->getRequestFactory());
     }
 
     public function testGenerateState(): void

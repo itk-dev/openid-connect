@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Strengthened constructor tests guided by mutation testing: the `jwt`
+  collaborator is asserted to become the request factory, and `0` is
+  asserted to be an accepted boundary value for `cacheDuration` and
+  `leeway`
+
 ## [5.0.0] - 2026-06-02
 
 Reworked exception hierarchy and tightened IdP-payload validations. The runtime
