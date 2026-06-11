@@ -1041,6 +1041,122 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertEquals(self::NONCE, $claims->nonce);
     }
 
+    public function testGetConfigurationCachesFetchedDocument(): void
+    {
+        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+
+        $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn($mockConfigResponse);
+
+        // On a cache miss the fetched discovery document must be stored with
+        // the configured cache duration, under the namespaced cache key.
+        $configCacheItem = $this->createMock(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(false);
+        $configCacheItem->expects($this->once())->method('set')->with($configuration)->willReturnSelf();
+        $configCacheItem->expects($this->once())->method('expiresAfter')->with(3600)->willReturnSelf();
+
+        $expectedCacheKey = 'itk-openid-connect-configuration-||'.hash('sha1', $openIDConnectMetadataUrl).'||configuration';
+
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool->expects($this->once())->method('getItem')->with($expectedCacheKey)->willReturn($configCacheItem);
+        $mockCacheItemPool->expects($this->once())->method('save')->with($configCacheItem)->willReturn(true);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+            'cacheDuration' => 3600,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $authUrl = $provider->getBaseAuthorizationUrl();
+        $this->assertSame('https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy', $authUrl);
+    }
+
+    public function testGetJwtVerificationKeysCachesFetchedKeys(): void
+    {
+        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+
+        $mockKeysResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDValidationKeys.json');
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn($mockKeysResponse);
+
+        $configCacheItem = $this->createStub(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(true);
+        $configCacheItem->method('get')->willReturn($configuration);
+
+        // On a JWKS cache miss the built Key map must be stored with the
+        // configured cache duration and saved to the pool.
+        $jwksCacheItem = $this->createMock(CacheItemInterface::class);
+        $jwksCacheItem->method('isHit')->willReturn(false);
+        $jwksCacheItem->expects($this->once())->method('set')->with($this->callback(
+            static fn (array $keys): bool => 1 === count($keys)
+                && $keys['111111111111111111111111111111111111111111'] instanceof Key
+        ))->willReturnSelf();
+        $jwksCacheItem->expects($this->once())->method('expiresAfter')->with(3600)->willReturnSelf();
+
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturnCallback(
+            static fn (string $key) => str_contains($key, 'jwks') ? $jwksCacheItem : $configCacheItem
+        );
+        $mockCacheItemPool->expects($this->once())->method('save')->with($jwksCacheItem)->willReturn(true);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+            'cacheDuration' => 3600,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        /** @var \Mockery\MockInterface $mockJWT */
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertEquals(self::NONCE, $claims->nonce);
+    }
+
+    public function testGetJwtVerificationKeysBuildsAllJwksKeys(): void
+    {
+        // Two RSA keys in the JWKS: the full key map (not just the first
+        // entry) must reach JWT::decode, since the token's "kid" may match
+        // any key published by the IdP.
+        $fixtureKeys = $this->loadMockFixture('mockOpenIDValidationKeys.json');
+        $this->assertIsArray($fixtureKeys['keys']);
+        $this->assertIsArray($fixtureKeys['keys'][0]);
+        $template = $fixtureKeys['keys'][0];
+
+        $jwks = ['keys' => [
+            ['kid' => 'key-a'] + $template,
+            ['kid' => 'key-b'] + $template,
+        ]];
+        $provider = $this->createProviderWithCustomJwks((string) json_encode($jwks));
+
+        /** @var \Mockery\MockInterface $mockJWT */
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT->shouldReceive('decode')->with(
+            \Mockery::type('string'),
+            \Mockery::on(static fn (array $keys): bool => 2 === count($keys)
+                && $keys['key-a'] instanceof Key
+                && $keys['key-b'] instanceof Key)
+        )->andReturn($this->getMockClaims());
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertEquals(self::NONCE, $claims->nonce);
+    }
+
     public function testGetConfigurationCacheInvalidArgument(): void
     {
         $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';

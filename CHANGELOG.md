@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strengthened cache assertions guided by mutation testing: the discovery
+  document and JWKS key map are asserted to be written to the cache with
+  the configured duration under the namespaced key, and a multi-key JWKS
+  is asserted to reach `JWT::decode` in full
 - Strengthened exception assertions guided by mutation testing: thrown
   messages are asserted in full (including dynamic parts), wrap-boundary
   exceptions assert code `0` and the chained `$previous` cause, and
