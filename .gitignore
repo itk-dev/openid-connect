@@ -22,3 +22,8 @@ yarn.lock
 
 # Per-developer Claude Code context — local tooling, not part of the public source.
 /CLAUDE.md
+
+###> infection/infection ###
+/infection.log
+/infection.html
+###< infection/infection ###
