@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strengthened constructor tests guided by mutation testing: the `jwt`
+  collaborator is asserted to become the request factory, and `0` is
+  asserted to be an accepted boundary value for `cacheDuration` and
+  `leeway`
 - Strengthened cache assertions guided by mutation testing: the discovery
   document and JWKS key map are asserted to be written to the cache with
   the configured duration under the namespaced key, and a multi-key JWKS
