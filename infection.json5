@@ -5,8 +5,11 @@
     },
     "threads": "max",
     // Minimum mutation score for covered code; enforced locally and in CI.
-    // Baseline measured at 71% — ratchet up as surviving mutants are killed.
-    "minCoveredMsi": 68,
+    // The suite scores 93%; the 13 surviving mutants are equivalent or
+    // contrived (JSON depth literals, RNG default lengths, casts only
+    // observable on corrupted cache). 90 defends the score with headroom
+    // for run-to-run variance.
+    "minCoveredMsi": 90,
     "logs": {
         "text": "infection.log",
         "html": "infection.html",
