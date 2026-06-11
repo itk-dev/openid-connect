@@ -15,18 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Strengthened constructor tests guided by mutation testing: the `jwt`
-  collaborator is asserted to become the request factory, and `0` is
-  asserted to be an accepted boundary value for `cacheDuration` and
-  `leeway`
-- Strengthened cache assertions guided by mutation testing: the discovery
-  document and JWKS key map are asserted to be written to the cache with
-  the configured duration under the namespaced key, and a multi-key JWKS
-  is asserted to reach `JWT::decode` in full
-- Strengthened exception assertions guided by mutation testing: thrown
-  messages are asserted in full (including dynamic parts), wrap-boundary
-  exceptions assert code `0` and the chained `$previous` cause, and
-  invalid JSON from the token endpoint is covered
+- Strengthened tests guided by mutation testing; mutation score raised to
+  93% with a CI threshold of 90 (`minCoveredMsi` in `infection.json5`)
 
 ## [5.0.0] - 2026-06-02
 
