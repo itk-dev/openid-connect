@@ -5,6 +5,7 @@
 [![PHP Version](https://img.shields.io/packagist/php-v/itk-dev/openid-connect.svg?style=flat-square&colorB=%238892BF)](https://www.php.net/downloads)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/itk-dev/openid-connect/php.yaml?branch=develop&label=CI&logo=github&style=flat-square)](https://github.com/itk-dev/openid-connect/actions/workflows/php.yaml?query=branch%3Adevelop)
 [![Codecov Code Coverage](https://img.shields.io/codecov/c/gh/itk-dev/openid-connect?label=codecov&logo=codecov&style=flat-square)](https://codecov.io/gh/itk-dev/openid-connect)
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&label=mutation%20score&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fitk-dev%2Fopenid-connect%2Fdevelop)](https://dashboard.stryker-mutator.io/reports/github.com/itk-dev/openid-connect/develop)
 [![Read License](https://img.shields.io/packagist/l/itk-dev/openid-connect.svg?style=flat-square&colorB=darkcyan)](https://github.com/itk-dev/openid-connect/blob/master/LICENSE.md)
 [![Package downloads on Packagist](https://img.shields.io/packagist/dt/itk-dev/openid-connect.svg?style=flat-square&colorB=darkmagenta)](https://packagist.org/packages/itk-dev/openid-connect/stats)
 
@@ -279,6 +280,27 @@ pass/fail results.
 The test suite uses [Mockery](https://github.com/mockery/mockery) to mock
 [public static methods](http://docs.mockery.io/en/latest/reference/public_static_properties.html?highlight=static)
 in 3rd party libraries like the `JWT::decode` method from `firebase/jwt`.
+
+### Mutation Testing
+
+Line coverage shows which code the tests _execute_; mutation testing shows
+which code they actually _verify_. [Infection](https://infection.github.io/)
+applies small changes (mutants) to the source code — flipping a comparison,
+removing a method call — and runs the test suite against each one. If the
+tests still pass, the mutant "escaped": a potential bug the tests would not
+catch.
+
+```shell
+task test:mutation
+```
+
+The minimum mutation score (`minCoveredMsi`) is defined in `infection.json5`
+and enforced both locally and in CI — no command line flags needed. CI
+annotates escaped mutants inline on pull requests, and results for `develop`
+are published to the
+[Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/itk-dev/openid-connect/develop),
+which also feeds the mutation score badge above. Detailed reports are written
+to `infection.log` and `infection.html` on each run.
 
 ### PHPStan Static Analysis
 

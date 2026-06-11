@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Mutation testing with [Infection](https://infection.github.io/)
+  (`task test:mutation`), run in CI and reported to the Stryker dashboard
+  (mutation score badge in README)
+
 ## [5.0.0] - 2026-06-02
 
 Reworked exception hierarchy and tightened IdP-payload validations. The runtime
