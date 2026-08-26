@@ -17,7 +17,11 @@ but should be usable for other OpenID Connect providers.
 
 ## References
 
+* [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
+* [OpenID Connect Basic Client Implementer's Guide 1.0](https://openid.net/specs/openid-connect-basic-1_0.html)
+  — the authorization code flow
 * [OpenID Connect Implicit Client Implementer's Guide 1.0](https://openid.net/specs/openid-connect-implicit-1_0.html)
+  — the current `response_type` default, deprecated; see below
 * [Azure Active Directory B2C documentation](https://docs.microsoft.com/en-us/azure/active-directory-b2c/)
 * [Web sign-in with OpenID Connect in Azure Active Directory B2C](https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-authentication-requests)
 
@@ -67,8 +71,8 @@ use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 
 $provider = new OpenIdConfigurationProvider([
     'redirectUri' => 'https://app.example.org', // Absolute url to where the user is redirected after a successful login
-    'openIDConnectMetadataUrl' => 'https:/.../openid-configuration', // url to OpenId Discovery document
-    'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Implementation of CacheItemPoolInterface for caching above discovery document
+    'openIDConnectMetadataUrl' => 'https://provider.example.org/.well-known/openid-configuration', // url to OpenId Discovery document
+    'cacheItemPool' => $cacheItemPool, // A Psr\Cache\CacheItemPoolInterface instance, for caching the discovery document and the JWKS
     'clientId' => 'client_id', // Client id assigned by authorizer
     'clientSecret' => 'client_secret', // Client password assigned by authorizer
     // optional values
@@ -129,7 +133,7 @@ Defaults to 10 seconds
 
 For more information see the following:
 
-* [firebase/php-jwt](https://github.com/firebase/php-jwt#example)
+* [firebase/php-jwt](https://github.com/googleapis/php-jwt#example)
   Last entry in the example mentions the leeway option.
 
 * [JWT documentation](http://self-issued.info/docs/draft-ietf-oauth-json-web-token.html#nbfDef)
@@ -271,22 +275,31 @@ values
 // Validate that the request state and session state match
 $sessionState = $this->session->get('oauth2state');
 $this->session->remove('oauth2state');
-if (!$sessionState || $request->query->get('state') !== $sessionState) {
+if (!is_string($sessionState) || !hash_equals($sessionState, (string) $request->query->get('state'))) {
     throw new ValidationException('Invalid state');
 }
 
-// Validate the id token. This will validate the token against the keys published by the
-// provider (Azure AD B2C), require the "exp" and "iat" claims that OIDC Core §2
-// makes mandatory, and check "aud", "iss" and "nonce". If the token is invalid or
-// the nonce doesn't match an exception will be thrown.
+// Exchange the code for an id token, then validate it. Validation checks the
+// signature against the keys published by the provider (Azure AD B2C), requires
+// the "exp" and "iat" claims that OIDC Core §2 makes mandatory, and checks
+// "aud", "iss" and "nonce". Any failure throws.
 try {
-    $claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
+    $idToken = $provider->getIdToken($request->query->get('code'));
+    $claims = $provider->validateIdToken($idToken, $session->get('oauth2nonce'));
     // Authentication successful
 } catch (OpenIdConnectExceptionInterface $exception) {
     // Handle failed authentication
 } finally {
     $this->session->remove('oauth2nonce');
 }
+```
+
+With PKCE, pass the stored verifier to `getIdToken()` as shown above. With the
+deprecated `id_token` response type there is no code to exchange and the token
+arrives in the query instead:
+
+```php
+$claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
 ```
 
 ### Exception handling
@@ -345,7 +358,9 @@ This starts the Docker containers and installs Composer dependencies.
 
 ### Running All CI Checks
 
-To run all checks locally (coding standards, static analysis, tests):
+To run all checks locally (composer validation, coding standards, static
+analysis at the dependency ceiling and floor, the test matrix, and mutation
+testing):
 
 ```shell
 task pr:actions
@@ -354,8 +369,12 @@ task pr:actions
 ### Unit Testing
 
 ```shell
-task test
+task test:coverage
 ```
+
+`phpunit.xml.dist` declares coverage reports, so the suite needs
+`XDEBUG_MODE=coverage`; `task test:coverage` sets it. `task test` runs PHPUnit
+without it and reports no executed tests.
 
 ### Test Matrix
 
@@ -371,7 +390,7 @@ pass/fail results.
 
 The test suite uses [Mockery](https://github.com/mockery/mockery) to mock
 [public static methods](http://docs.mockery.io/en/latest/reference/public_static_properties.html?highlight=static)
-in 3rd party libraries like the `JWT::decode` method from `firebase/jwt`.
+in 3rd party libraries like the `JWT::decode` method from `firebase/php-jwt`.
 
 ### Mutation Testing
 
@@ -386,8 +405,10 @@ catch.
 task test:mutation
 ```
 
-The minimum mutation score (`minCoveredMsi`) is defined in `infection.json5`
-and enforced both locally and in CI — no command line flags needed. CI
+The minimum mutation score (`minMsi` and `minCoveredMsi`, both 100) is defined
+in `infection.json5` and enforced both locally and in CI — no command line flags
+needed. Mutants that no test could distinguish are excluded per mutator there,
+with the reason recorded, so the threshold stays binding. CI
 annotates escaped mutants inline on pull requests, and results for `develop`
 are published to the
 [Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/itk-dev/openid-connect/develop),
@@ -397,8 +418,19 @@ to `infection.log` and `infection.html` on each run.
 ### PHPStan Static Analysis
 
 ```shell
-task analyze
+task analyze:php
 ```
+
+`phpstan.neon` pins the analysis to the whole `php ^8.3` range that
+`composer.json` declares, so the result does not depend on the PHP version it
+runs on. The dependency floor is a separate axis, covered by its own job:
+
+```shell
+task analyze:php:lowest
+```
+
+That lowers only the packages `require` names — leaving the dev tooling current
+— analyses, and restores the ceiling afterwards.
 
 ### Coding Standards
 
