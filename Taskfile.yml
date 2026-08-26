@@ -132,6 +132,21 @@ tasks:
         cmds:
             - "{{.PHP}} vendor/bin/phpstan"
 
+    analyze:php:lowest:
+        # Lowers only the packages `require` names, so the dev tooling stays
+        # current: a plain --prefer-lowest drags PHPUnit and phpstan-mockery
+        # down too, and then most of what is reported is an artefact of that
+        # rather than a statement about the runtime dependencies.
+        #
+        # The deferred `composer update` restores the ceiling even when the
+        # analysis fails, so this leaves the container as it found it. Analysis
+        # only — never run a formatter against the downgraded vendor.
+        desc: Run PHPStan against the declared dependency floor
+        cmds:
+            - defer: "{{.COMPOSER}} update -q"
+            - "{{.PHP}} sh -c 'composer update -q --prefer-lowest --with-all-dependencies $(composer show --direct --no-dev --name-only)'"
+            - "{{.PHP}} vendor/bin/phpstan"
+
     # Testing
 
     test:
@@ -284,5 +299,6 @@ tasks:
             - task: composer:check
             - task: lint
             - task: analyze:php
+            - task: analyze:php:lowest
             - task: test:matrix
             - task: test:mutation

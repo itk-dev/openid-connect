@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mutation testing with [Infection](https://infection.github.io/)
   (`task test:mutation`), run in CI and reported to the Stryker dashboard
   (mutation score badge in README)
+- `phpstan-lowest` CI job and the matching `task analyze:php:lowest`, analysing
+  the declared dependency floor with current dev tooling. Only the packages
+  `require` names are lowered, so findings are about the runtime dependencies
+  rather than a downgraded PHPUnit
 
 ### Changed
 
@@ -35,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newly escaped mutant fails the build rather than being absorbed by headroom,
   and pull requests stay free of `--logger-github` annotations unless they
   genuinely regress the score
+- PHPStan analyses the whole PHP range `composer.json` declares (`phpVersion`
+  8.3–8.5 in `phpstan.neon`) rather than whichever version the job happens to
+  run on, and the main job runs on PHP 8.5 so it resolves the newest installable
+  dependency set. Previously analysing on 8.3 said nothing about 8.5
+- Raised the `league/oauth2-client` floor to `^2.8.1` (was `^2.6`). PKCE support
+  arrived in 2.7.0, and 2.8.1 raises league's own Guzzle constraint to
+  `^6.5.8 || ^7.4.5` for the advisories affecting earlier releases
+- Raised `robrichards/xmlseclibs` to `^4.0` (was `^3.1.5`). 4.0 requires
+  `php >= 8.0`, which this library's `php ^8.3` satisfies, and replaces its
+  `ext-openssl` requirement with `phpseclib/phpseclib ^3.0`.
+  `XMLSecurityKey::convertRSA()` — the only API used here — is unchanged
 - Bumped `infection/infection` to `^0.35.2` (was `^0.33.2`), so the 100
   threshold is verified against the current mutator set rather than one two
   minors behind. The newer release generates the same mutants and needs no

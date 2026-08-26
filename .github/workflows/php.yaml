@@ -26,6 +26,12 @@ jobs:
                   docker compose run --rm phpfpm vendor/bin/php-cs-fixer fix --dry-run --diff
 
     phpstan:
+        # Analysed on the highest supported PHP rather than the default 8.3
+        # service, so this job sees the newest dependency set Composer can
+        # resolve: league/oauth2-client declares a PHP *upper* bound, so which of
+        # its releases is installable depends on the runtime version. phpstan.neon
+        # pins the analysis to the declared php ^8.3 range, so the language floor
+        # stays protected from here; phpstan-lowest covers the dependency floor.
         name: PHPStan
         runs-on: ubuntu-latest
         steps:
@@ -36,7 +42,35 @@ jobs:
                   docker network create frontend
 
             - run: |
+                  docker compose run --rm phpfpm85 composer install
+                  docker compose run --rm phpfpm85 vendor/bin/phpstan
+
+    phpstan-lowest:
+        # The declared dependency floor, analysed with current dev tooling. A
+        # plain --prefer-lowest also downgrades PHPUnit and phpstan-mockery, and
+        # then most of what is reported is an artefact of that rather than a
+        # statement about the runtime dependencies. Lowering only what `require`
+        # names keeps the analysis about the versions this library claims to
+        # support.
+        #
+        # Runs on the PHP floor, in the default 8.3 service, as the counterpart
+        # to the phpstan job's ceiling on 8.5.
+        #
+        # Analysis only: never add a formatter to this job, and do not reuse the
+        # resulting vendor/ for anything but PHPStan.
+        name: PHPStan (lowest runtime dependencies)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Create docker network
+              run: |
+                  docker network create frontend
+
+            - run: |
                   docker compose run --rm phpfpm composer install
+                  docker compose run --rm phpfpm sh -c \
+                      'composer update --prefer-lowest --with-all-dependencies $(composer show --direct --no-dev --name-only)'
                   docker compose run --rm phpfpm vendor/bin/phpstan
 
     unit-tests:
