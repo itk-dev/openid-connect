@@ -122,6 +122,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`provider.example.org` for IdP-side URLs, `app.example.org` for
   application-side URLs) instead of invented registrable domains
 
+### Deprecated
+
+- The `response_type` default of `id_token` in `getAuthorizationUrl()`, together
+  with the `response_mode` default of `query`. That pair is the OIDC implicit
+  flow with the ID token delivered in the query string: OIDC Core §3.2.2.5
+  returns implicit-flow parameters in the fragment, so the `query` mode relies on
+  a provider extension to be readable server-side, and it puts a credential where
+  access logs and browser history can keep it. Pass
+  `'response_type' => 'code'` and exchange the code with `getIdToken()`. **The
+  default becomes `code` in 6.0**, so passing it explicitly now is
+  forward-compatible. No runtime deprecation notice is emitted, since the noise
+  would fall on consumers who cannot silence it except by making this change
+
 ### Documentation
 
 - Named the storage contract for `state` and `nonce`: the caller persists both

@@ -171,6 +171,13 @@ class OpenIdConfigurationProvider extends AbstractProvider
         // Add default response_type and response_mode. The `scope` default is
         // supplied by getDefaultScopes() via league's
         // getAuthorizationParameters(), so it is not repeated here.
+        //
+        // DEPRECATED DEFAULT: `id_token` is the OIDC implicit flow, and the
+        // `query` response mode exists to make the token readable server-side —
+        // OIDC Core §3.2.2.5 returns implicit-flow parameters in the fragment,
+        // so this relies on a provider extension and puts a credential in access
+        // logs. Callers should pass `response_type => 'code'` and exchange via
+        // getIdToken(). The default becomes `code` in 6.0.
         return parent::getAuthorizationUrl($options + [
             'response_type' => 'id_token',
             'response_mode' => 'query',
