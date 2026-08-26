@@ -57,6 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has one home and a stated rationale instead of being an ordering that happened
   to hold. Under PHP-FPM this is a formality, but it is what a fibre-based or
   worker runtime would depend on
+- The previous `JWT::$leeway` value is restored after each decode. Under PHP-FPM
+  the mutated static died with the request; in a worker process it persisted for
+  the life of the process and silently applied to any other `firebase/php-jwt`
+  consumer that never set its own leeway. Writing a process-global is
+  unavoidable given the upstream API, but leaving it written is not
 - The discovery document and the JWKS are capped at 1 MiB each, raising
   `HttpException` when a response exceeds it. Both are a few kilobytes in
   practice, so a hostile or misconfigured endpoint could previously hand over an

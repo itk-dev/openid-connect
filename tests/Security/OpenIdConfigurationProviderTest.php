@@ -314,15 +314,44 @@ class OpenIdConfigurationProviderTest extends TestCase
      */
     public function testValidateIdTokenAppliesConfiguredLeeway(): void
     {
-        MockJWT::$leeway = null;
+        MockJWT::$leeway = 5;
+
+        $observedDuringDecode = null;
+        $mockClaims = $this->getMockClaims();
 
         $mockJWT = $this->overloadJwt();
-        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
+        $mockJWT->shouldReceive('decode')->andReturnUsing(
+            function () use (&$observedDuringDecode, $mockClaims): \stdClass {
+                $observedDuringDecode = MockJWT::$leeway;
+
+                return $mockClaims;
+            }
+        );
 
         $this->provider->validateIdToken('token', self::NONCE);
 
         // 30 is the leeway the provider is constructed with in setUp().
-        $this->assertSame(30, MockJWT::$leeway);
+        $this->assertSame(30, $observedDuringDecode, 'Configured leeway must be in effect for the decode');
+        $this->assertSame(5, MockJWT::$leeway, 'Any pre-existing leeway must be restored afterwards');
+    }
+
+    /**
+     * The static is restored even when the decode throws, so a rejected token
+     * cannot leave this library's leeway applied to the rest of the process.
+     */
+    public function testValidateIdTokenRestoresLeewayWhenDecodeFails(): void
+    {
+        MockJWT::$leeway = 5;
+
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
+
+        try {
+            $this->provider->validateIdToken('token', self::NONCE);
+            $this->fail('Expected ValidationException was not thrown');
+        } catch (ValidationException) {
+            $this->assertSame(5, MockJWT::$leeway, 'Leeway must be restored on the failure path too');
+        }
     }
 
     public function testValidateIdTokenFailure(): void

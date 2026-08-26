@@ -310,6 +310,12 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * would not be sufficient at all. Revisit before adopting FrankenPHP
      * workers or any other long-lived concurrent runtime.
      *
+     * The previous value is restored afterwards. Under FPM the mutated static
+     * dies with the request either way, but in a worker it would persist for the
+     * life of the process and silently apply to any other firebase/php-jwt
+     * consumer in it that never sets its own leeway. Writing a process-global is
+     * unavoidable here; leaving it written is not.
+     *
      * @param array<string, Key> $keys Verification keys, indexed by JWK `kid`
      *
      * @return \stdClass The token's payload, as JWT::decode() returns it
@@ -318,9 +324,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function decodeWithLeeway(string $idToken, array $keys): \stdClass
     {
+        $previousLeeway = JWT::$leeway;
         JWT::$leeway = $this->leeway;
 
-        return JWT::decode($idToken, $keys);
+        try {
+            return JWT::decode($idToken, $keys);
+        } finally {
+            JWT::$leeway = $previousLeeway;
+        }
     }
 
     /**
