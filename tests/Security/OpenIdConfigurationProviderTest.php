@@ -38,6 +38,10 @@ class OpenIdConfigurationProviderTest extends TestCase
     private const REDIRECT_URI = 'https://app.example.org';
     private const NONCE = '12345678';
 
+    // Mirrors OpenIdConfigurationProvider::MAX_JSON_RESOURCE_BYTES, which is
+    // private. Asserting the boundary needs the exact value.
+    private const MAX_JSON_RESOURCE_BYTES = 1048576;
+
     private OpenIdConfigurationProvider $provider;
 
     public function setUp(): void
@@ -1180,6 +1184,71 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->fail('Expected HttpException');
     }
 
+    /**
+     * A body one byte over the limit is refused. Exercised through a response
+     * that reports no size, so it is the retrieved content that trips the cap.
+     */
+    public function testFetchJsonResourceRejectsOversizedContent(): void
+    {
+        $provider = $this->createProviderWithMetadataBody($this->discoveryDocumentOfExactByteSize(self::MAX_JSON_RESOURCE_BYTES + 1));
+
+        $this->expectException(HttpException::class);
+        $this->expectExceptionMessage(sprintf(
+            'Json resource is larger than the %d byte limit (%d bytes): https://provider.example.org/openid-configuration',
+            self::MAX_JSON_RESOURCE_BYTES,
+            self::MAX_JSON_RESOURCE_BYTES + 1,
+        ));
+
+        $provider->getBaseAuthorizationUrl();
+    }
+
+    /**
+     * A body of exactly the limit is accepted and still parsed. Paired with the
+     * test above, this pins the comparison to the byte rather than leaving the
+     * boundary free.
+     */
+    public function testFetchJsonResourceAcceptsContentAtTheLimit(): void
+    {
+        $provider = $this->createProviderWithMetadataBody($this->discoveryDocumentOfExactByteSize(self::MAX_JSON_RESOURCE_BYTES));
+
+        $this->assertSame(
+            'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy',
+            $provider->getBaseAuthorizationUrl()
+        );
+    }
+
+    /**
+     * Where the response declares its size, that is checked before the body is
+     * retrieved at all — a chunked response declares none, which is why the
+     * content is checked too.
+     */
+    public function testFetchJsonResourceRejectsOversizedDeclaredSize(): void
+    {
+        $provider = $this->createProviderWithMetadataBody('{}', self::MAX_JSON_RESOURCE_BYTES + 1);
+
+        $this->expectException(HttpException::class);
+        $this->expectExceptionMessage(sprintf(
+            'Json resource is larger than the %d byte limit (%d bytes): https://provider.example.org/openid-configuration',
+            self::MAX_JSON_RESOURCE_BYTES,
+            self::MAX_JSON_RESOURCE_BYTES + 1,
+        ));
+
+        $provider->getBaseAuthorizationUrl();
+    }
+
+    public function testFetchJsonResourceAcceptsDeclaredSizeAtTheLimit(): void
+    {
+        $provider = $this->createProviderWithMetadataBody(
+            $this->discoveryDocumentOfExactByteSize(self::MAX_JSON_RESOURCE_BYTES),
+            self::MAX_JSON_RESOURCE_BYTES,
+        );
+
+        $this->assertSame(
+            'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy',
+            $provider->getBaseAuthorizationUrl()
+        );
+    }
+
     public function testFetchJsonResourceInvalidJson(): void
     {
         $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
@@ -1804,6 +1873,61 @@ class OpenIdConfigurationProviderTest extends TestCase
         );
 
         return $mockJWT;
+    }
+
+    /**
+     * Build a provider whose metadata URL answers with the given raw body, on a
+     * cache miss so the fetch actually happens.
+     *
+     * @param int|null $declaredSize what the response reports as its body size;
+     *                               null models a chunked response
+     */
+    private function createProviderWithMetadataBody(string $body, ?int $declaredSize = null): OpenIdConfigurationProvider
+    {
+        $mockStream = $this->createStub(StreamInterface::class);
+        $mockStream->method('getContents')->willReturn($body);
+        $mockStream->method('getSize')->willReturn($declaredSize);
+
+        $mockResponse = $this->createStub(ResponseInterface::class);
+        $mockResponse->method('getStatusCode')->willReturn(200);
+        $mockResponse->method('getBody')->willReturn($mockStream);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn($mockResponse);
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        return new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+    }
+
+    /**
+     * Encode the discovery fixture, padded so the JSON is exactly $bytes long.
+     */
+    private function discoveryDocumentOfExactByteSize(int $bytes): string
+    {
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+        $configuration['pad'] = '';
+
+        $padding = $bytes - strlen((string) json_encode($configuration));
+        $this->assertGreaterThan(0, $padding, 'Requested size must exceed the fixture itself');
+
+        $configuration['pad'] = str_repeat('a', $padding);
+        $json = (string) json_encode($configuration);
+        $this->assertSame($bytes, strlen($json), 'Padding must land on the requested size exactly');
+
+        return $json;
     }
 
     private function loadMockFixture(string $filename): array
