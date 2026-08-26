@@ -187,13 +187,35 @@ container that memoizes the service — the property holds whichever request wro
 it last, which may belong to a different user. `generateNonce()` stores nothing,
 and the state is best treated as though it did the same.
 
-Note that the default response type and mode
-is set in ```OpenIdConfigurationProvider.php```
+##### Response type: pass `code` explicitly
+
+`getAuthorizationUrl()` currently defaults to
 
 ```php
 'response_type' => 'id_token',
 'response_mode' => 'query',
 ```
+
+which is the OIDC implicit flow with the ID token delivered in the query string.
+**Pass `'response_type' => 'code'` and exchange the code with `getIdToken()`
+instead.** The default will become `code` in 6.0; passing it explicitly now is
+both the recommended flow and forward-compatible.
+
+Two reasons to move:
+
+* OIDC Core [§3.2.2.5](https://openid.net/specs/openid-connect-core-1_0.html)
+  specifies that implicit-flow parameters are returned in the _fragment_. A
+  fragment never reaches the server, so the `response_mode => 'query'` default
+  exists to make the ID token readable server-side — a provider extension
+  (Azure AD B2C supports it) rather than something the spec describes.
+* That puts a credential in the query string, where it reaches web server access
+  logs and browser history.
+
+[RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) §2.1.2 recommends `code`
+over response types that return tokens in the authorization response. Its
+normative sentence names access tokens, so it does not literally cover a bare
+`id_token` response — but `code` is the flow it points at, and the one
+[openid-connect-bundle](https://github.com/itk-dev/openid-connect-bundle) uses.
 
 #### Verify authorized requests
 
