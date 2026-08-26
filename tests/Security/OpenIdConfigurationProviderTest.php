@@ -361,6 +361,162 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * OIDC Core §2 makes "exp" REQUIRED, and firebase/php-jwt validates it only
+     * when present — so a token without it would never expire.
+     */
+    public function testValidateIdTokenRequiresExpClaim(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        unset($mockClaims->exp);
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required numeric "exp" claim (OIDC Core §2)');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testValidateIdTokenRequiresNumericExpClaim(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->exp = 'not-a-timestamp';
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required numeric "exp" claim (OIDC Core §2)');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testValidateIdTokenRequiresIatClaim(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        unset($mockClaims->iat);
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required numeric "iat" claim (OIDC Core §2)');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * A non-string issuer used to reach string concatenation in the exception
+     * message, turning a claims mismatch into an "Array to string conversion".
+     */
+    public function testValidateIdTokenRequiresStringIssuer(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->iss = ['not', 'a', 'string'];
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required string "iss" claim');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * As above for the nonce, which also guards hash_equals() against a
+     * non-string second argument.
+     */
+    public function testValidateIdTokenRequiresStringNonce(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->nonce = null;
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required string "nonce" claim');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testValidateIdTokenRejectsEmptyNonce(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->nonce = '';
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required string "nonce" claim');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * Audience matching is a strict comparison. PHP's loose comparison treats
+     * numeric strings as equal by value, so an IdP announcing an audience of
+     * "1e2" would otherwise satisfy a client id of "100".
+     */
+    public function testValidateIdTokenComparesAudienceStrictly(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([], clientId: '100');
+
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->aud = '1e2';
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token has incorrect audience(s): 1e2');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * A non-string audience entry cannot match a string client id, and must not
+     * reach the exception message either.
+     */
+    public function testValidateIdTokenIgnoresNonStringAudienceEntries(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->aud = [['nested'], self::CLIENT_ID];
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        /** @var object{aud: list<mixed>} $claims */
+        $claims = $this->provider->validateIdToken('token', self::NONCE);
+
+        $this->assertSame([['nested'], self::CLIENT_ID], $claims->aud);
+    }
+
+    /**
+     * With every audience entry non-string there is nothing to match, and the
+     * message must stay printable — interpolating the raw list would render an
+     * "Array to string conversion" instead of naming the audiences.
+     */
+    public function testValidateIdTokenKeepsAudienceMessagePrintable(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->aud = [['nested']];
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        try {
+            $this->provider->validateIdToken('token', self::NONCE);
+            $this->fail('Expected ClaimsException was not thrown');
+        } catch (ClaimsException $thrown) {
+            $this->assertSame('ID token has incorrect audience(s): ', $thrown->getMessage());
+        }
+    }
+
     public function testConstructBadUrl(): void
     {
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
@@ -1672,7 +1828,7 @@ class OpenIdConfigurationProviderTest extends TestCase
      *
      * @param array<string, string> $overrides Discovery document keys to replace
      */
-    private function createProviderWithConfigurationOverrides(array $overrides, bool $allowHttp = false): OpenIdConfigurationProvider
+    private function createProviderWithConfigurationOverrides(array $overrides, bool $allowHttp = false, string $clientId = self::CLIENT_ID): OpenIdConfigurationProvider
     {
         $configuration = array_merge($this->loadMockFixture('mockOpenIDConfiguration.json'), $overrides);
 
@@ -1696,7 +1852,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         return new OpenIdConfigurationProvider([
             'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheItemPool' => $mockCacheItemPool,
-            'clientId' => self::CLIENT_ID,
+            'clientId' => $clientId,
             'clientSecret' => self::CLIENT_SECRET,
             'redirectUri' => self::REDIRECT_URI,
             'allowHttp' => $allowHttp,
@@ -1771,6 +1927,11 @@ class OpenIdConfigurationProviderTest extends TestCase
         // "issuer": "https://azure_b2c_test.b2clogin.com/11111111-1111-1111-1111-111111111111/v2.0/",
         $mockClaims->iss = 'https://azure_b2c_test.b2clogin.com/11111111-1111-1111-1111-111111111111/v2.0/';
         $mockClaims->nonce = self::NONCE;
+        // REQUIRED by OIDC Core §2 and asserted by validateIdToken(). The values
+        // are never compared — firebase/php-jwt does that during the decode,
+        // which is mocked out here — only their presence.
+        $mockClaims->exp = 2000000000;
+        $mockClaims->iat = 1000000000;
 
         return $mockClaims;
     }

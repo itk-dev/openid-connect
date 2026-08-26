@@ -218,8 +218,15 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Do any required verification of the id token and return an array of decoded claims.
      *
-     * Note: The "exp" (expiration) claim is validated by firebase/php-jwt during
-     * JWT::decode(), using the configured leeway for clock skew tolerance.
+     * The "exp" (expiration) claim is validated by firebase/php-jwt during
+     * JWT::decode(), using the configured leeway for clock skew tolerance. It is
+     * only validated when present, so this method additionally asserts that
+     * "exp" and "iat" exist — both REQUIRED by OIDC Core §2 — which is what
+     * stops a token without "exp" from never expiring.
+     *
+     * "aud", "iss" and "nonce" are checked here. The nonce comparison is
+     * constant-time: it is the only claim compared against a value the caller
+     * holds, so a timing signal would leak that secret.
      *
      * Note: JWT::$leeway is a static property, so in environments with multiple
      * OpenIdConfigurationProvider instances (e.g. multi-tenant setups in long-running
@@ -247,25 +254,77 @@ class OpenIdConfigurationProvider extends AbstractProvider
             // NB: JWT::$leeway is a static property shared across all instances.
             // Always set it immediately before decode to ensure the correct value.
             JWT::$leeway = $this->leeway;
-            /** @var \stdClass&object{aud: string|array<string>, iss: string, nonce: string} $claims */
             $claims = JWT::decode($idToken, $keys);
+
+            // "exp" and "iat" are REQUIRED by OIDC Core §2, but
+            // firebase/php-jwt only validates them when they are present — a
+            // token without "exp" never expires. Presence is asserted here so
+            // the decode above is what enforces the deadline.
+            self::requireNumericClaim($claims, 'exp');
+            self::requireNumericClaim($claims, 'iat');
+
             // "aud" may be an array of strings or a single string
             // (cf. https://openid.net/specs/openid-connect-core-1_0.html#IDToken).
-            $audiences = (array) $claims->aud;
-            if (!in_array($this->clientId, $audiences)) {
+            // Non-string entries are dropped: they cannot match a string client
+            // id under strict comparison, and would turn the message below into
+            // an "Array to string conversion".
+            $audiences = array_filter((array) $claims->aud, 'is_string');
+            if (!in_array($this->clientId, $audiences, true)) {
                 throw new ClaimsException('ID token has incorrect audience(s): '.implode(', ', $audiences));
             }
-            if ($claims->iss !== $this->getConfiguration('issuer')) {
-                throw new ClaimsException('ID token has incorrect issuer: '.$claims->iss);
+
+            $issuer = self::requireStringClaim($claims, 'iss');
+            if ($issuer !== $this->getConfiguration('issuer')) {
+                throw new ClaimsException('ID token has incorrect issuer: '.$issuer);
             }
-            if ($claims->nonce !== $nonce) {
-                throw new ClaimsException('ID token has incorrect nonce: '.$claims->nonce);
+
+            // Compared in constant time: the nonce is the one claim checked
+            // against a value the caller holds, so a timing signal here would
+            // leak that secret rather than a public identifier.
+            $claimedNonce = self::requireStringClaim($claims, 'nonce');
+            if (!hash_equals($nonce, $claimedNonce)) {
+                throw new ClaimsException('ID token has incorrect nonce: '.$claimedNonce);
             }
 
             return $claims;
         } catch (\UnexpectedValueException $e) {
             throw new ValidationException('ID token validation failed: '.$e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * Assert that a claim is present and numeric.
+     *
+     * Presence only — the value itself is validated by firebase/php-jwt during
+     * the decode, using the configured leeway.
+     *
+     * @throws ClaimsException
+     */
+    private static function requireNumericClaim(object $claims, string $name): void
+    {
+        if (!isset($claims->{$name}) || !is_numeric($claims->{$name})) {
+            throw new ClaimsException(sprintf('ID token missing required numeric "%s" claim (OIDC Core §2)', $name));
+        }
+    }
+
+    /**
+     * Assert that a claim is present and a non-empty string, and return it.
+     *
+     * Returning the narrowed value keeps the callers from re-reading an
+     * arbitrarily typed property, which is what made string concatenation in
+     * their exception messages unsafe.
+     *
+     * @throws ClaimsException
+     */
+    private static function requireStringClaim(object $claims, string $name): string
+    {
+        $value = $claims->{$name} ?? null;
+
+        if (!is_string($value) || '' === $value) {
+            throw new ClaimsException(sprintf('ID token missing required string "%s" claim', $name));
+        }
+
+        return $value;
     }
 
     /**

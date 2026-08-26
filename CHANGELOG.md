@@ -50,6 +50,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newly escaped mutant fails the build rather than being absorbed by headroom,
   and pull requests stay free of `--logger-github` annotations unless they
   genuinely regress the score
+- `validateIdToken()` now requires the `exp` and `iat` claims, both REQUIRED by
+  OIDC Core §2, and raises `ClaimsException` when either is absent or
+  non-numeric. `firebase/php-jwt` validates `exp` only when it is present, so a
+  token omitting it never expired. Forged tokens already died at the signature
+  check, so this needs a misbehaving IdP to matter — but **an IdP that issues ID
+  tokens without `exp` or `iat` will now be rejected**
+- `validateIdToken()` compares the nonce with `hash_equals()` rather than `!==`.
+  The nonce is the one claim checked against a value the caller holds, so a
+  timing signal there would leak that secret rather than a public identifier
+- `validateIdToken()` compares the audience strictly. PHP's loose comparison
+  treats numeric strings as equal by value, so an IdP announcing an audience of
+  `"1e2"` previously satisfied a client id of `"100"`. Audience entries that are
+  not strings are ignored, since they cannot match a string client id
+- `validateIdToken()` requires `iss` and `nonce` to be non-empty strings, raising
+  `ClaimsException` otherwise. Both were interpolated into exception messages
+  unchecked, so a signed token carrying an array in either claim turned a claims
+  mismatch into an `\Error` that did not implement
+  `OpenIdConnectExceptionInterface`
 - The JWKS cache now holds the discovery-fetched JWKS document rather than the
   `Key` objects built from it, under a new cache key (`…||jwks-document`).
   `JWK::parseKey()` returns keys wrapping an `OpenSSLAsymmetricKey`, which PHP

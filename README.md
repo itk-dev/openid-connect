@@ -199,8 +199,9 @@ if (!$sessionState || $request->query->get('state') !== $sessionState) {
 }
 
 // Validate the id token. This will validate the token against the keys published by the
-// provider (Azure AD B2C). If the token is invalid or the nonce doesn't match an
-// exception will be thrown.
+// provider (Azure AD B2C), require the "exp" and "iat" claims that OIDC Core §2
+// makes mandatory, and check "aud", "iss" and "nonce". If the token is invalid or
+// the nonce doesn't match an exception will be thrown.
 try {
     $claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
     // Authentication successful
