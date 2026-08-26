@@ -54,6 +54,17 @@ class OpenIdConfigurationProvider extends AbstractProvider
     // decode and cache.
     private const int MAX_JSON_RESOURCE_BYTES = 1048576;
 
+    // PKCE (RFC 7636). S256 is the only challenge method offered: "plain" is a
+    // downgrade with no reason to exist where sha256 is available.
+    //
+    // RFC 7636 §4.1 allows a verifier of 43 to 128 characters and servers must
+    // support the whole range, so the verifier is always generated at the
+    // maximum — a shorter one has nothing to recommend it. 96 random bytes
+    // base64url-encode to exactly 128 characters with no padding, which is why
+    // that byte count and no other.
+    private const string PKCE_CHALLENGE_METHOD = 'S256';
+    private const int PKCE_VERIFIER_BYTES = 96;
+
     // @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
     private const string POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
     private const string ID_TOKEN_HINT = 'id_token_hint';
@@ -166,6 +177,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
         // @see https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-authentication-requests
         if (empty($options['nonce'])) {
             throw new MissingParameterException('Required parameter "nonce" missing');
+        }
+
+        // PKCE (RFC 7636) is opt-in: passing a code_challenge turns it on. The
+        // method is filled in here because omitting it makes the server assume
+        // "plain" (RFC 7636 §4.3), which would silently downgrade an S256
+        // challenge to a value sent in the clear.
+        if (!empty($options['code_challenge'])) {
+            $options += ['code_challenge_method' => self::PKCE_CHALLENGE_METHOD];
         }
 
         // Add default response_type and response_mode. The `scope` default is
@@ -385,18 +404,27 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @throws OpenIdConnectExceptionInterface
      */
-    public function getIdToken(string $code): string
+    public function getIdToken(string $code, ?string $codeVerifier = null): string
     {
         try {
             $endpoint = $this->getSecureEndpoint('token_endpoint');
+
+            $params = [
+                'client_id' => $this->clientId,
+                'client_secret' => $this->clientSecret,
+                'redirect_uri' => $this->redirectUri,
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+            ];
+
+            // Sent only when the caller holds one. An unsolicited code_verifier
+            // is an error to a server that issued no challenge.
+            if (null !== $codeVerifier) {
+                $params['code_verifier'] = $codeVerifier;
+            }
+
             $response = $this->getHttpClient()->request('POST', $endpoint, [
-                'form_params' => [
-                    'client_id' => $this->clientId,
-                    'client_secret' => $this->clientSecret,
-                    'redirect_uri' => $this->redirectUri,
-                    'grant_type' => 'authorization_code',
-                    'code' => $code,
-                ],
+                'form_params' => $params,
             ]);
 
             $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
@@ -466,6 +494,43 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * @throws JsonException
      * @throws MetadataException
      */
+    /**
+     * Generate a PKCE code verifier (RFC 7636 §4.1).
+     *
+     * Nothing is stored on the provider. As with `generateNonce()`, the caller
+     * is the only holder — and here that is not merely tidy. league's own PKCE
+     * support keeps the verifier on the provider instance, which on an instance
+     * shared between requests (a long-running worker, or a container that
+     * memoizes the service) would let one request's verifier be sent for
+     * another's token exchange. Persist this in the session next to the state
+     * and the nonce, and hand it back to `getIdToken()`.
+     *
+     * The length is not configurable: RFC 7636 caps the verifier at 128
+     * characters and requires servers to accept that, so there is no reason to
+     * ask for less entropy.
+     *
+     * @return string A 128-character code verifier
+     */
+    public function generatePkceVerifier(): string
+    {
+        return self::base64urlEncode(random_bytes(self::PKCE_VERIFIER_BYTES));
+    }
+
+    /**
+     * Derive the S256 code challenge for a verifier (RFC 7636 §4.2).
+     *
+     * A pure function of its argument: no provider state is read or written, so
+     * the verifier never comes to rest on this object.
+     *
+     * @param string $verifier The code verifier to derive a challenge for
+     *
+     * @return string The S256 challenge, for the `code_challenge` authorization parameter
+     */
+    public function getPkceChallenge(string $verifier): string
+    {
+        return self::base64urlEncode(hash('sha256', $verifier, true));
+    }
+
     public function getBaseAccessTokenUrl(array $params): string
     {
         return $this->getSecureEndpoint('token_endpoint');
@@ -618,6 +683,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * Encode base 64 url, without padding (RFC 7515 §2).
+     */
+    private static function base64urlEncode(string $input): string
+    {
+        return rtrim(strtr(base64_encode($input), '+/', '-_'), '=');
     }
 
     /**

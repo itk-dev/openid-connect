@@ -217,6 +217,47 @@ normative sentence names access tokens, so it does not literally cover a bare
 `id_token` response — but `code` is the flow it points at, and the one
 [openid-connect-bundle](https://github.com/itk-dev/openid-connect-bundle) uses.
 
+##### PKCE (RFC 7636)
+
+PKCE is opt-in, and there is no configuration flag: passing a `code_challenge`
+turns it on, omitting it changes nothing.
+
+The verifier is a secret and belongs in the session alongside the state and the
+nonce. Only its challenge may reach the authorization request.
+
+```php
+// Authorization request
+$verifier = $provider->generatePkceVerifier();
+$session->set('oauth2pkce', $verifier);
+
+$authUrl = $provider->getAuthorizationUrl([
+    'state' => $state,
+    'nonce' => $nonce,
+    'response_type' => 'code',
+    'code_challenge' => $provider->getPkceChallenge($verifier),
+]);
+```
+
+`code_challenge_method=S256` is filled in for you. Omitting it would make the
+server assume `plain` (RFC 7636 §4.3) and treat the challenge as a value sent in
+the clear, so it is not left to the caller to remember.
+
+On the way back, hand the verifier to the code exchange:
+
+```php
+$verifier = $session->get('oauth2pkce');
+$session->remove('oauth2pkce');
+
+$idToken = $provider->getIdToken($request->query->get('code'), $verifier);
+$claims = $provider->validateIdToken($idToken, $session->get('oauth2nonce'));
+```
+
+`generatePkceVerifier()` stores nothing on the provider, which is deliberate.
+`league/oauth2-client` keeps its own verifier on the provider object; on an
+instance shared between requests that would let one request's verifier be sent
+for another request's exchange — the same hazard as reading `getState()` back.
+The session is the only place the verifier should live.
+
 #### Verify authorized requests
 
 The authorization service will redirect the user back to the `redirectUri`. This

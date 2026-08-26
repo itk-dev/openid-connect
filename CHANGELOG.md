@@ -23,6 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mutation testing with [Infection](https://infection.github.io/)
   (`task test:mutation`), run in CI and reported to the Stryker dashboard
   (mutation score badge in README)
+- PKCE support (RFC 7636), S256 only. `generatePkceVerifier()` returns a
+  128-character verifier and `getPkceChallenge()` derives its challenge;
+  `getIdToken()` takes the verifier as an optional second argument and sends
+  `code_verifier` when given. PKCE is opt-in with no configuration flag —
+  passing a `code_challenge` to `getAuthorizationUrl()` turns it on, and
+  `code_challenge_method=S256` is filled in automatically, since omitting it
+  makes the server assume `plain` (RFC 7636 §4.3) and treat the challenge as a
+  cleartext value. Neither the verifier nor the challenge is stored on the
+  provider: `league/oauth2-client` keeps its verifier on the provider object,
+  which on an instance shared between requests would let one request's verifier
+  be sent for another request's token exchange, so the verifier is carried by
+  the caller in the session exactly like the state and the nonce
 - `phpstan-lowest` CI job and the matching `task analyze:php:lowest`, analysing
   the declared dependency floor with current dev tooling. Only the packages
   `require` names are lowered, so findings are about the runtime dependencies

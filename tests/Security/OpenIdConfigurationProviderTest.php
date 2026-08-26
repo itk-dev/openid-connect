@@ -238,6 +238,84 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertSame($nonce, $query['nonce']);
     }
 
+    /**
+     * RFC 7636 Appendix B publishes a verifier/challenge pair; deriving anything
+     * else means the challenge would not match at the token endpoint.
+     */
+    public function testGetPkceChallengeMatchesTheRfcTestVector(): void
+    {
+        $this->assertSame(
+            'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            $this->provider->getPkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk')
+        );
+    }
+
+    public function testGeneratePkceVerifierProducesAMaximumLengthVerifier(): void
+    {
+        $verifier = $this->provider->generatePkceVerifier();
+
+        // RFC 7636 §4.1 caps the verifier at 128 characters and restricts it to
+        // the unreserved set.
+        $this->assertSame(128, strlen($verifier));
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9\-._~]+$/', $verifier);
+        $this->assertNotSame($verifier, $this->provider->generatePkceVerifier(), 'Each call must produce a fresh verifier');
+    }
+
+    /**
+     * Omitting code_challenge_method makes the server assume "plain"
+     * (RFC 7636 §4.3), so passing a challenge must carry S256 with it.
+     */
+    public function testGetAuthorizationUrlAddsS256MethodWithAChallenge(): void
+    {
+        $verifier = $this->provider->generatePkceVerifier();
+        $challenge = $this->provider->getPkceChallenge($verifier);
+
+        $query = $this->authorizationUrlQuery(['code_challenge' => $challenge]);
+
+        $this->assertSame($challenge, $query['code_challenge']);
+        $this->assertSame('S256', $query['code_challenge_method']);
+    }
+
+    /**
+     * The verifier is the secret half of the exchange. It is carried in the
+     * caller's session and must never reach the authorization request.
+     */
+    public function testGetAuthorizationUrlNeverCarriesTheVerifier(): void
+    {
+        $verifier = $this->provider->generatePkceVerifier();
+
+        $authUrl = $this->provider->getAuthorizationUrl([
+            'state' => '12345678',
+            'nonce' => 'abcdefghij',
+            'code_challenge' => $this->provider->getPkceChallenge($verifier),
+        ]);
+
+        $this->assertStringNotContainsString($verifier, $authUrl);
+        $this->assertStringNotContainsString('code_verifier', $authUrl);
+    }
+
+    public function testGetAuthorizationUrlOmitsPkceWithoutAChallenge(): void
+    {
+        $query = $this->authorizationUrlQuery([]);
+
+        $this->assertArrayNotHasKey('code_challenge', $query);
+        $this->assertArrayNotHasKey('code_challenge_method', $query);
+    }
+
+    /**
+     * A caller who names the method keeps it, so a provider needing "plain"
+     * is not locked out by the default.
+     */
+    public function testGetAuthorizationUrlKeepsAnExplicitChallengeMethod(): void
+    {
+        $query = $this->authorizationUrlQuery([
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'plain',
+        ]);
+
+        $this->assertSame('plain', $query['code_challenge_method']);
+    }
+
     public function testGetAuthorizationUrlStateException(): void
     {
         $this->expectException(MissingParameterException::class);
@@ -915,6 +993,61 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $idToken = $provider->getIdToken('test-code');
         $this->assertSame('the-id-token', $idToken);
+    }
+
+    /**
+     * With a verifier the exchange carries `code_verifier`, and only then: the
+     * request map below matches on exact form parameters, so an unconditionally
+     * added key would fail to match and the stub would return null. That is what
+     * pins both halves of the condition.
+     */
+    public function testGetIdTokenSendsCodeVerifierWhenGiven(): void
+    {
+        $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
+        $verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+
+        $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
+
+        $tokenResponseBody = json_encode(['id_token' => 'the-id-token']);
+        $mockTokenStream = $this->createStub(StreamInterface::class);
+        $mockTokenStream->method('getContents')->willReturn($tokenResponseBody);
+        $mockTokenStream->method('__toString')->willReturn($tokenResponseBody);
+
+        $mockTokenResponse = $this->createStub(ResponseInterface::class);
+        $mockTokenResponse->method('getStatusCode')->willReturn(200);
+        $mockTokenResponse->method('getBody')->willReturn($mockTokenStream);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturnMap([
+            ['GET', $openIDConnectMetadataUrl, [], $mockConfigResponse],
+            ['POST', $tokenEndpoint, ['form_params' => [
+                'client_id' => self::CLIENT_ID,
+                'client_secret' => self::CLIENT_SECRET,
+                'redirect_uri' => self::REDIRECT_URI,
+                'grant_type' => 'authorization_code',
+                'code' => 'test-code',
+                'code_verifier' => $verifier,
+            ]], $mockTokenResponse],
+        ]);
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $this->assertSame('the-id-token', $provider->getIdToken('test-code', $verifier));
     }
 
     public function testGetIdTokenFailure(): void
@@ -1976,6 +2109,30 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertSame($bytes, strlen($json), 'Padding must land on the requested size exactly');
 
         return $json;
+    }
+
+    /**
+     * Build an authorization URL with state and nonce supplied, and return its
+     * query parameters.
+     *
+     * @param array<string, string> $options extra authorization parameters
+     *
+     * @return array<int|string, array<mixed>|string> as parse_str() populates it
+     */
+    private function authorizationUrlQuery(array $options): array
+    {
+        $authUrl = $this->provider->getAuthorizationUrl($options + [
+            'state' => '12345678',
+            'nonce' => 'abcdefghij',
+        ]);
+
+        $queryString = parse_url($authUrl, PHP_URL_QUERY);
+        $this->assertIsString($queryString, 'Generated authorization URL must have a query string');
+
+        $query = [];
+        parse_str($queryString, $query);
+
+        return $query;
     }
 
     private function loadMockFixture(string $filename): array
