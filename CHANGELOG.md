@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newly escaped mutant fails the build rather than being absorbed by headroom,
   and pull requests stay free of `--logger-github` annotations unless they
   genuinely regress the score
+- The discovery document and the JWKS are capped at 1 MiB each, raising
+  `HttpException` when a response exceeds it. Both are a few kilobytes in
+  practice, so a hostile or misconfigured endpoint could previously hand over an
+  unbounded body to decode and cache. The declared body size is checked first
+  where the response reports one, and the retrieved content unconditionally,
+  since a chunked response reports no size. The cap bounds what gets decoded and
+  cached rather than peak memory — Guzzle has already buffered the body by the
+  time this library sees it
 - `validateIdToken()` now requires the `exp` and `iat` claims, both REQUIRED by
   OIDC Core §2, and raises `ClaimsException` when either is absent or
   non-numeric. `firebase/php-jwt` validates `exp` only when it is present, so a

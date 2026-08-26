@@ -48,6 +48,12 @@ class OpenIdConfigurationProvider extends AbstractProvider
     // the common case (Azure AD B2C, Keycloak).
     private const string SIGNING_ALGORITHM = 'RS256';
 
+    // Upper bound on the discovery document and the JWKS. Both are small — a
+    // few kilobytes in practice — so a mebibyte is generous while still keeping
+    // a hostile or misconfigured endpoint from handing us an unbounded body to
+    // decode and cache.
+    private const int MAX_JSON_RESOURCE_BYTES = 1048576;
+
     // @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
     private const string POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
     private const string ID_TOKEN_HINT = 'id_token_hint';
@@ -578,6 +584,17 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Fetch remote json resource.
      *
+     * Both resources this fetches — the discovery document and the JWKS — are
+     * capped at MAX_JSON_RESOURCE_BYTES. The declared body size is checked first
+     * where the response reports one, and the retrieved content unconditionally,
+     * because a chunked response reports no size.
+     *
+     * The cap bounds what gets decoded and written to the cache, not peak
+     * memory: Guzzle has already buffered the body by the time it is visible
+     * here. Bounding the transfer itself would mean a streaming read against a
+     * `stream => true` request, which is a larger change than the exposure
+     * warrants for a document fetched from a configured host over TLS.
+     *
      * @return array Json decoded to array
      *
      * @throws HttpException
@@ -592,7 +609,18 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 throw new HttpException('Cannot access json resource: '.$resourceUrl);
             }
 
-            $content = $response->getBody()->getContents();
+            $body = $response->getBody();
+            $declaredSize = $body->getSize();
+
+            if (null !== $declaredSize && $declaredSize > self::MAX_JSON_RESOURCE_BYTES) {
+                throw new HttpException($this->oversizedResourceMessage($resourceUrl, $declaredSize));
+            }
+
+            $content = $body->getContents();
+
+            if (strlen($content) > self::MAX_JSON_RESOURCE_BYTES) {
+                throw new HttpException($this->oversizedResourceMessage($resourceUrl, strlen($content)));
+            }
 
             /** @var array $resource */
             $resource = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
@@ -603,6 +631,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
         } catch (\JsonException $e) {
             throw new JsonException($e->getMessage(), 0, $e);
         }
+    }
+
+    private function oversizedResourceMessage(string $resourceUrl, int $size): string
+    {
+        return sprintf(
+            'Json resource is larger than the %d byte limit (%d bytes): %s',
+            self::MAX_JSON_RESOURCE_BYTES,
+            $size,
+            $resourceUrl,
+        );
     }
 
     /**
