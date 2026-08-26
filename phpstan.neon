@@ -7,6 +7,18 @@ parameters:
 		- src
 		- tests
 	reportIgnoresWithoutComments: true
+
+	# Analyse against the whole range composer.json declares (php ^8.3), not just
+	# the version this happens to run on. Without it PHPStan assumes the runtime
+	# PHP, so analysing on 8.3 says nothing about 8.5, and analysing on 8.5 would
+	# accept syntax that breaks 8.3 consumers.
+	#
+	# It does not cover the *dependency* axis: which versions of league/oauth2-client
+	# and firebase/php-jwt get installed is decided by Composer, not by this setting.
+	# The phpstan-lowest CI job covers that floor.
+	phpVersion:
+		min: 80300
+		max: 80500
 	ignoreErrors:
 		-
 			identifier: missingType.iterableValue

@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-08-26
+
+Security hardening, with no API breaks. Three changes affect running
+deployments: an IdP announcing plain-http endpoints now requires `allowHttp`, an
+ID token without `exp` or `iat` is rejected, and the JWKS cache key changed so
+entries written by 5.0 are not reused.
+
+### Added
+
+- PKCE (RFC 7636), S256 only. `generatePkceVerifier()` returns a 128-character
+  verifier, `getPkceChallenge()` derives its challenge, and `getIdToken()` takes
+  the verifier as an optional second argument. Opt-in: passing `code_challenge`
+  to `getAuthorizationUrl()` enables it, and `code_challenge_method=S256` is
+  added with it. Neither value is stored on the provider — the caller carries
+  the verifier, as with `state` and `nonce`
+
+### Changed
+
+- `allowHttp` governs every URL the client uses, not only
+  `openIDConnectMetadataUrl`. The `authorization_endpoint`, `token_endpoint`,
+  `userinfo_endpoint`, `end_session_endpoint` and `jwks_uri` read from the
+  discovery document raise `IllegalSchemeException` when they announce plain
+  http and `allowHttp` is `false`, and `BadUrlException` when unparsable.
+  Scheme comparison is case-insensitive, so `HTTPS://` is accepted
+- `validateIdToken()` requires `exp` and `iat`, raising `ClaimsException` when
+  either is absent or non-numeric
+- `validateIdToken()` compares the nonce with `hash_equals()`, compares the
+  audience strictly, ignores non-string audience entries, and requires `iss`
+  and `nonce` to be non-empty strings
+- The discovery document and the JWKS are capped at 1 MiB each, raising
+  `HttpException` above that
+- The JWKS cache holds the fetched JWKS document rather than the parsed `Key`
+  objects, under the cache key `…||jwks-document`
+- `JWT::$leeway` is written in one place and restored after each decode, so the
+  process-global is no longer left applied to other `firebase/php-jwt`
+  consumers in the same process
+- `getIdToken()` no longer catches `IdentityProviderException`; it issues its
+  request directly, so `checkResponse()` is never on that path
+- `league/oauth2-client` requires `^2.8.1` (was `^2.6`)
+
+### Deprecated
+
+- The `response_type` default of `id_token` and `response_mode` default of
+  `query` in `getAuthorizationUrl()`. Pass `'response_type' => 'code'` and
+  exchange the code with `getIdToken()`. The default becomes `code` in 6.0
+
+### Removed
+
+- Dependency on `robrichards/xmlseclibs`. JWKS entries are converted to
+  verification keys by `firebase/php-jwt`'s `JWK::parseKey()`
+
+### Fixed
+
+- A JWKS RSA entry whose `e` or `n` base64-decodes to zero bytes raises
+  `JwksException` instead of yielding an unusable key
+
+### Tooling
+
+- Mutation testing with [Infection](https://infection.github.io/)
+  (`task test:mutation`), enforced in CI at 100% (`minMsi` and `minCoveredMsi`
+  in `infection.json5`) and reported to the Stryker dashboard
+- PHPStan analyses the declared `php ^8.3` range (8.3–8.5) instead of the
+  runtime version, and runs on PHP 8.5
+- `phpstan-lowest` CI job and `task analyze:php:lowest`, analysing the declared
+  dependency floor
+
+### Documentation
+
+- `state` and `nonce` are caller-carried. The inherited `getState()` must not be
+  read back: on a provider instance shared between requests it holds whichever
+  request wrote it last
+- README sections covering scheme enforcement, PKCE, and the `response_type`
+  default
+
 ## [5.0.0] - 2026-06-02
 
 Reworked exception hierarchy and tightened IdP-payload validations. The runtime
@@ -227,7 +301,8 @@ for the consumer migration guide.
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/5.0.0...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/5.1.0...HEAD
+[5.1.0]: https://github.com/itk-dev/openid-connect/compare/5.0.0...5.1.0
 [5.0.0]: https://github.com/itk-dev/openid-connect/compare/4.1.2...5.0.0
 [4.1.2]: https://github.com/itk-dev/openid-connect/compare/4.1.1...4.1.2
 [4.1.1]: https://github.com/itk-dev/openid-connect/compare/4.1.0...4.1.1

@@ -20,6 +20,7 @@ use ItkDev\OpenIdConnect\Exception\ValidationException;
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use League\OAuth2\Client\Token\AccessToken;
+use League\OAuth2\Client\Tool\RequestFactory;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
@@ -34,8 +35,12 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     private const CLIENT_ID = 'test_client_id';
     private const CLIENT_SECRET = 'test_client_secret';
-    private const REDIRECT_URI = 'https://redirect.url';
+    private const REDIRECT_URI = 'https://app.example.org';
     private const NONCE = '12345678';
+
+    // Mirrors OpenIdConfigurationProvider::MAX_JSON_RESOURCE_BYTES, which is
+    // private. Asserting the boundary needs the exact value.
+    private const MAX_JSON_RESOURCE_BYTES = 1048576;
 
     private OpenIdConfigurationProvider $provider;
 
@@ -43,7 +48,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         parent::setUp();
 
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -105,7 +110,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheDuration' => -10,
         ], []);
     }
@@ -119,9 +124,43 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'leeway' => -10,
         ], []);
+    }
+
+    public function testConstructZeroCacheDurationAndLeewayAccepted(): void
+    {
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+
+        // Zero is a valid boundary value for both options: cache nothing,
+        // tolerate no clock skew. Only negative values are rejected.
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+            'cacheDuration' => 0,
+            'leeway' => 0,
+        ], []);
+
+        $this->assertInstanceOf(OpenIdConfigurationProvider::class, $provider);
+    }
+
+    public function testConstructWiresJwtCollaboratorAsRequestFactory(): void
+    {
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $requestFactory = new RequestFactory();
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+        ], [
+            'jwt' => $requestFactory,
+        ]);
+
+        // The 'jwt' collaborator must become the provider's request factory;
+        // without the explicit wiring the parent's default factory would be
+        // silently used instead.
+        $this->assertSame($requestFactory, $provider->getRequestFactory());
     }
 
     public function testGenerateState(): void
@@ -135,6 +174,26 @@ class OpenIdConfigurationProviderTest extends TestCase
     {
         $nonce = $this->provider->generateNonce(32);
         $this->assertSame(32, strlen($nonce));
+    }
+
+    /**
+     * The default length is the entropy of the state parameter, so it is
+     * asserted without passing an explicit argument.
+     */
+    public function testGenerateStateDefaultsTo32Characters(): void
+    {
+        $state = $this->provider->generateState();
+
+        $this->assertSame(32, strlen($state));
+        $this->assertSame($state, $this->provider->getState());
+    }
+
+    /**
+     * As above, for the nonce.
+     */
+    public function testGenerateNonceDefaultsTo32Characters(): void
+    {
+        $this->assertSame(32, strlen($this->provider->generateNonce()));
     }
 
     public function testGetBaseAuthorizationUrl(): void
@@ -177,6 +236,84 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertSame('query', $query['response_mode']);
         $this->assertSame($state, $query['state']);
         $this->assertSame($nonce, $query['nonce']);
+    }
+
+    /**
+     * RFC 7636 Appendix B publishes a verifier/challenge pair; deriving anything
+     * else means the challenge would not match at the token endpoint.
+     */
+    public function testGetPkceChallengeMatchesTheRfcTestVector(): void
+    {
+        $this->assertSame(
+            'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            $this->provider->getPkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk')
+        );
+    }
+
+    public function testGeneratePkceVerifierProducesAMaximumLengthVerifier(): void
+    {
+        $verifier = $this->provider->generatePkceVerifier();
+
+        // RFC 7636 §4.1 caps the verifier at 128 characters and restricts it to
+        // the unreserved set.
+        $this->assertSame(128, strlen($verifier));
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9\-._~]+$/', $verifier);
+        $this->assertNotSame($verifier, $this->provider->generatePkceVerifier(), 'Each call must produce a fresh verifier');
+    }
+
+    /**
+     * Omitting code_challenge_method makes the server assume "plain"
+     * (RFC 7636 §4.3), so passing a challenge must carry S256 with it.
+     */
+    public function testGetAuthorizationUrlAddsS256MethodWithAChallenge(): void
+    {
+        $verifier = $this->provider->generatePkceVerifier();
+        $challenge = $this->provider->getPkceChallenge($verifier);
+
+        $query = $this->authorizationUrlQuery(['code_challenge' => $challenge]);
+
+        $this->assertSame($challenge, $query['code_challenge']);
+        $this->assertSame('S256', $query['code_challenge_method']);
+    }
+
+    /**
+     * The verifier is the secret half of the exchange. It is carried in the
+     * caller's session and must never reach the authorization request.
+     */
+    public function testGetAuthorizationUrlNeverCarriesTheVerifier(): void
+    {
+        $verifier = $this->provider->generatePkceVerifier();
+
+        $authUrl = $this->provider->getAuthorizationUrl([
+            'state' => '12345678',
+            'nonce' => 'abcdefghij',
+            'code_challenge' => $this->provider->getPkceChallenge($verifier),
+        ]);
+
+        $this->assertStringNotContainsString($verifier, $authUrl);
+        $this->assertStringNotContainsString('code_verifier', $authUrl);
+    }
+
+    public function testGetAuthorizationUrlOmitsPkceWithoutAChallenge(): void
+    {
+        $query = $this->authorizationUrlQuery([]);
+
+        $this->assertArrayNotHasKey('code_challenge', $query);
+        $this->assertArrayNotHasKey('code_challenge_method', $query);
+    }
+
+    /**
+     * A caller who names the method keeps it, so a provider needing "plain"
+     * is not locked out by the default.
+     */
+    public function testGetAuthorizationUrlKeepsAnExplicitChallengeMethod(): void
+    {
+        $query = $this->authorizationUrlQuery([
+            'code_challenge' => 'challenge-value',
+            'code_challenge_method' => 'plain',
+        ]);
+
+        $this->assertSame('plain', $query['code_challenge_method']);
     }
 
     public function testGetAuthorizationUrlStateException(): void
@@ -226,8 +363,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenSuccess(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
 
         // Assert that 'decode' is called as decode(<string>, [<string>, <Firebase\JWT\Key>])
@@ -248,61 +384,267 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertEquals(self::CLIENT_ID, $claims->aud);
     }
 
-    public function testValidateIdTokenFailure(): void
+    /**
+     * The configured leeway must reach firebase/php-jwt. It travels through the
+     * process-global JWT::$leeway, which is why MockJWT declares that static —
+     * asserting it here is what pins decodeWithLeeway() to writing the
+     * provider's value rather than leaving whatever was there before.
+     */
+    public function testValidateIdTokenAppliesConfiguredLeeway(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
-        $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
+        MockJWT::$leeway = 5;
 
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('ID token validation failed');
+        $observedDuringDecode = null;
+        $mockClaims = $this->getMockClaims();
+
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andReturnUsing(
+            function () use (&$observedDuringDecode, $mockClaims): \stdClass {
+                $observedDuringDecode = MockJWT::$leeway;
+
+                return $mockClaims;
+            }
+        );
 
         $this->provider->validateIdToken('token', self::NONCE);
+
+        // 30 is the leeway the provider is constructed with in setUp().
+        $this->assertSame(30, $observedDuringDecode, 'Configured leeway must be in effect for the decode');
+        $this->assertSame(5, MockJWT::$leeway, 'Any pre-existing leeway must be restored afterwards');
+    }
+
+    /**
+     * The static is restored even when the decode throws, so a rejected token
+     * cannot leave this library's leeway applied to the rest of the process.
+     */
+    public function testValidateIdTokenRestoresLeewayWhenDecodeFails(): void
+    {
+        MockJWT::$leeway = 5;
+
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
+
+        try {
+            $this->provider->validateIdToken('token', self::NONCE);
+            $this->fail('Expected ValidationException was not thrown');
+        } catch (ValidationException) {
+            $this->assertSame(5, MockJWT::$leeway, 'Leeway must be restored on the failure path too');
+        }
+    }
+
+    public function testValidateIdTokenFailure(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
+
+        try {
+            $this->provider->validateIdToken('token', self::NONCE);
+        } catch (ValidationException $thrown) {
+            $this->assertSame('ID token validation failed: Signature verification failed', $thrown->getMessage());
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertInstanceOf(SignatureInvalidException::class, $thrown->getPrevious(), 'Original cause must be chained');
+
+            return;
+        }
+        $this->fail('Expected ValidationException');
     }
 
     public function testValidateIdTokenAudience(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = 'incorrect aud';
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
         $this->expectException(ClaimsException::class);
-        $this->expectExceptionMessage('ID token has incorrect audience');
+        $this->expectExceptionMessage('ID token has incorrect audience(s): incorrect aud');
 
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
     public function testValidateIdTokenIssuer(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->iss = 'incorrect iss';
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
         $this->expectException(ClaimsException::class);
-        $this->expectExceptionMessage('ID token has incorrect issuer');
+        $this->expectExceptionMessage('ID token has incorrect issuer: incorrect iss');
 
         $this->provider->validateIdToken('token', self::NONCE);
     }
 
     public function testValidateIdTokenNonce(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->nonce = 'incorrect nonce';
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
         $this->expectException(ClaimsException::class);
-        $this->expectExceptionMessage('ID token has incorrect nonce');
+        $this->expectExceptionMessage('ID token has incorrect nonce: incorrect nonce');
 
         $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * OIDC Core §2 makes "exp" REQUIRED, and firebase/php-jwt validates it only
+     * when present — so a token without it would never expire.
+     */
+    public function testValidateIdTokenRequiresExpClaim(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        unset($mockClaims->exp);
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required numeric "exp" claim (OIDC Core §2)');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testValidateIdTokenRequiresNumericExpClaim(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->exp = 'not-a-timestamp';
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required numeric "exp" claim (OIDC Core §2)');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testValidateIdTokenRequiresIatClaim(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        unset($mockClaims->iat);
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required numeric "iat" claim (OIDC Core §2)');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * A non-string issuer used to reach string concatenation in the exception
+     * message, turning a claims mismatch into an "Array to string conversion".
+     */
+    public function testValidateIdTokenRequiresStringIssuer(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->iss = ['not', 'a', 'string'];
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required string "iss" claim');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * As above for the nonce, which also guards hash_equals() against a
+     * non-string second argument.
+     */
+    public function testValidateIdTokenRequiresStringNonce(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->nonce = null;
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required string "nonce" claim');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testValidateIdTokenRejectsEmptyNonce(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->nonce = '';
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token missing required string "nonce" claim');
+
+        $this->provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * Audience matching is a strict comparison. PHP's loose comparison treats
+     * numeric strings as equal by value, so an IdP announcing an audience of
+     * "1e2" would otherwise satisfy a client id of "100".
+     */
+    public function testValidateIdTokenComparesAudienceStrictly(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([], clientId: '100');
+
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->aud = '1e2';
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        $this->expectException(ClaimsException::class);
+        $this->expectExceptionMessage('ID token has incorrect audience(s): 1e2');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * A non-string audience entry cannot match a string client id, and must not
+     * reach the exception message either.
+     */
+    public function testValidateIdTokenIgnoresNonStringAudienceEntries(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->aud = [['nested'], self::CLIENT_ID];
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        /** @var object{aud: list<mixed>} $claims */
+        $claims = $this->provider->validateIdToken('token', self::NONCE);
+
+        $this->assertSame([['nested'], self::CLIENT_ID], $claims->aud);
+    }
+
+    /**
+     * With every audience entry non-string there is nothing to match, and the
+     * message must stay printable — interpolating the raw list would render an
+     * "Array to string conversion" instead of naming the audiences.
+     */
+    public function testValidateIdTokenKeepsAudienceMessagePrintable(): void
+    {
+        $mockJWT = $this->overloadJwt();
+        $mockClaims = $this->getMockClaims();
+        $mockClaims->aud = [['nested']];
+
+        $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        try {
+            $this->provider->validateIdToken('token', self::NONCE);
+            $this->fail('Expected ClaimsException was not thrown');
+        } catch (ClaimsException $thrown) {
+            $this->assertSame('ID token has incorrect audience(s): ', $thrown->getMessage());
+        }
     }
 
     public function testConstructBadUrl(): void
@@ -310,7 +652,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
 
         $this->expectException(BadUrlException::class);
-        $this->expectExceptionMessage('OpenIDConnectMetadataUrl is invalid');
+        $this->expectExceptionMessage('OpenIDConnectMetadataUrl is invalid: not-a-valid-url');
 
         new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
@@ -323,11 +665,11 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
 
         $this->expectException(IllegalSchemeException::class);
-        $this->expectExceptionMessage('OpenIDConnectMetadataUrl must use https');
+        $this->expectExceptionMessage('OpenIDConnectMetadataUrl must use https: http://provider.example.org/openid-configuration');
 
         new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'http://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'http://provider.example.org/openid-configuration',
         ], []);
     }
 
@@ -342,7 +684,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $provider = new OpenIdConfigurationProvider([
             'cacheItemPool' => $mockCacheItemPool,
-            'openIDConnectMetadataUrl' => 'http://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'http://provider.example.org/openid-configuration',
             'allowHttp' => true,
             'clientId' => self::CLIENT_ID,
             'clientSecret' => self::CLIENT_SECRET,
@@ -352,6 +694,136 @@ class OpenIdConfigurationProviderTest extends TestCase
         ]);
 
         $this->assertInstanceOf(OpenIdConfigurationProvider::class, $provider);
+    }
+
+    public function testConstructAcceptsUppercaseHttpsScheme(): void
+    {
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'HTTPS://provider.example.org/openid-configuration',
+        ], []);
+
+        $this->assertInstanceOf(OpenIdConfigurationProvider::class, $provider);
+    }
+
+    public function testDiscoveredAuthorizationEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => 'http://provider.example.org/oauth2/v2.0/authorize',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "authorization_endpoint" must use https: http://provider.example.org/oauth2/v2.0/authorize');
+
+        $provider->getBaseAuthorizationUrl();
+    }
+
+    public function testDiscoveredTokenEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'token_endpoint' => 'http://provider.example.org/oauth2/v2.0/token',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "token_endpoint" must use https: http://provider.example.org/oauth2/v2.0/token');
+
+        $provider->getBaseAccessTokenUrl([]);
+    }
+
+    /**
+     * The load-bearing case: the code exchange posts the client secret, so a
+     * discovery document announcing a plain-http token endpoint must fail
+     * before the request goes out.
+     */
+    public function testIdTokenExchangeRefusesHttpTokenEndpoint(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'token_endpoint' => 'http://provider.example.org/oauth2/v2.0/token',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "token_endpoint" must use https: http://provider.example.org/oauth2/v2.0/token');
+
+        $provider->getIdToken('test-code');
+    }
+
+    public function testDiscoveredUserinfoEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'userinfo_endpoint' => 'http://provider.example.org/openid/userinfo',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "userinfo_endpoint" must use https: http://provider.example.org/openid/userinfo');
+
+        $provider->getResourceOwnerDetailsUrl($this->createStub(AccessToken::class));
+    }
+
+    public function testDiscoveredEndSessionEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'end_session_endpoint' => 'http://provider.example.org/oauth2/v2.0/logout',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "end_session_endpoint" must use https: http://provider.example.org/oauth2/v2.0/logout');
+
+        $provider->getEndSessionUrl();
+    }
+
+    /**
+     * The JWKS URI decides which keys sign-off on identities, so it is held to
+     * the same scheme policy. `getJwtVerificationKeys()` refuses before the
+     * fetch, hence no JWT decode is reached.
+     */
+    public function testJwksFetchRefusesHttpJwksUri(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'jwks_uri' => 'http://provider.example.org/discovery/v2.0/keys',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "jwks_uri" must use https: http://provider.example.org/discovery/v2.0/keys');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testDiscoveredHttpEndpointsAreAllowedWithAllowHttp(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => 'http://provider.example.org/oauth2/v2.0/authorize',
+            'token_endpoint' => 'http://provider.example.org/oauth2/v2.0/token',
+            'userinfo_endpoint' => 'http://provider.example.org/openid/userinfo',
+            'end_session_endpoint' => 'http://provider.example.org/oauth2/v2.0/logout',
+        ], allowHttp: true);
+
+        $this->assertSame('http://provider.example.org/oauth2/v2.0/authorize', $provider->getBaseAuthorizationUrl());
+        $this->assertSame('http://provider.example.org/oauth2/v2.0/token', $provider->getBaseAccessTokenUrl([]));
+        $this->assertSame('http://provider.example.org/openid/userinfo', $provider->getResourceOwnerDetailsUrl($this->createStub(AccessToken::class)));
+        $this->assertSame('http://provider.example.org/oauth2/v2.0/logout', $provider->getEndSessionUrl());
+    }
+
+    public function testDiscoveredEndpointAcceptsUppercaseHttpsScheme(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => 'HTTPS://provider.example.org/oauth2/v2.0/authorize',
+        ]);
+
+        $this->assertSame('HTTPS://provider.example.org/oauth2/v2.0/authorize', $provider->getBaseAuthorizationUrl());
+    }
+
+    public function testDiscoveredEndpointWithoutSchemeIsRejected(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => '/oauth2/v2.0/authorize',
+        ]);
+
+        $this->expectException(BadUrlException::class);
+        $this->expectExceptionMessage('OIDC discovery document "authorization_endpoint" is invalid: /oauth2/v2.0/authorize');
+
+        $provider->getBaseAuthorizationUrl();
     }
 
     public function testGetEndSessionUrlWithIdToken(): void
@@ -421,10 +893,15 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $method = new \ReflectionMethod(OpenIdConfigurationProvider::class, 'checkResponse');
 
-        $this->expectException(IdentityProviderException::class);
-        $this->expectExceptionMessage('400');
+        try {
+            $method->invoke($this->provider, $response, []);
+        } catch (IdentityProviderException $thrown) {
+            $this->assertSame('400', $thrown->getMessage());
+            $this->assertSame(0, $thrown->getCode());
 
-        $method->invoke($this->provider, $response, []);
+            return;
+        }
+        $this->fail('Expected IdentityProviderException');
     }
 
     public function testCreateResourceOwner(): void
@@ -440,8 +917,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenArrayAudience(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = [self::CLIENT_ID, 'other_client'];
 
@@ -456,15 +932,14 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenArrayAudienceInvalid(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = ['wrong_client_1', 'wrong_client_2'];
 
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
         $this->expectException(ClaimsException::class);
-        $this->expectExceptionMessage('ID token has incorrect audience');
+        $this->expectExceptionMessage('ID token has incorrect audience(s): wrong_client_1, wrong_client_2');
 
         $this->provider->validateIdToken('token', self::NONCE);
     }
@@ -472,7 +947,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetIdTokenSuccess(): void
     {
         $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -520,9 +995,64 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertSame('the-id-token', $idToken);
     }
 
+    /**
+     * With a verifier the exchange carries `code_verifier`, and only then: the
+     * request map below matches on exact form parameters, so an unconditionally
+     * added key would fail to match and the stub would return null. That is what
+     * pins both halves of the condition.
+     */
+    public function testGetIdTokenSendsCodeVerifierWhenGiven(): void
+    {
+        $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
+        $verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+
+        $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
+
+        $tokenResponseBody = json_encode(['id_token' => 'the-id-token']);
+        $mockTokenStream = $this->createStub(StreamInterface::class);
+        $mockTokenStream->method('getContents')->willReturn($tokenResponseBody);
+        $mockTokenStream->method('__toString')->willReturn($tokenResponseBody);
+
+        $mockTokenResponse = $this->createStub(ResponseInterface::class);
+        $mockTokenResponse->method('getStatusCode')->willReturn(200);
+        $mockTokenResponse->method('getBody')->willReturn($mockTokenStream);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturnMap([
+            ['GET', $openIDConnectMetadataUrl, [], $mockConfigResponse],
+            ['POST', $tokenEndpoint, ['form_params' => [
+                'client_id' => self::CLIENT_ID,
+                'client_secret' => self::CLIENT_SECRET,
+                'redirect_uri' => self::REDIRECT_URI,
+                'grant_type' => 'authorization_code',
+                'code' => 'test-code',
+                'code_verifier' => $verifier,
+            ]], $mockTokenResponse],
+        ]);
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $this->assertSame('the-id-token', $provider->getIdToken('test-code', $verifier));
+    }
+
     public function testGetIdTokenFailure(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
         // PSR-18 transport stub — Guzzle's real exceptions need a RequestInterface
@@ -547,16 +1077,77 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        $this->expectException(CodeException::class);
-        $this->expectExceptionMessage('Get ID token failed');
+        try {
+            $provider->getIdToken('test-code');
+        } catch (CodeException $thrown) {
+            $this->assertSame('Get ID token failed: Connection failed', $thrown->getMessage());
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertInstanceOf(ClientExceptionInterface::class, $thrown->getPrevious(), 'Original cause must be chained');
 
-        $provider->getIdToken('test-code');
+            return;
+        }
+        $this->fail('Expected CodeException');
+    }
+
+    public function testGetIdTokenRejectsInvalidJsonResponse(): void
+    {
+        $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
+
+        $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
+
+        $malformedTokenResponseBody = 'not valid json{{{';
+        $mockTokenStream = $this->createStub(StreamInterface::class);
+        $mockTokenStream->method('getContents')->willReturn($malformedTokenResponseBody);
+        $mockTokenStream->method('__toString')->willReturn($malformedTokenResponseBody);
+
+        $mockTokenResponse = $this->createStub(ResponseInterface::class);
+        $mockTokenResponse->method('getStatusCode')->willReturn(200);
+        $mockTokenResponse->method('getBody')->willReturn($mockTokenStream);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturnMap([
+            ['GET', $openIDConnectMetadataUrl, [], $mockConfigResponse],
+            ['POST', $tokenEndpoint, ['form_params' => [
+                'client_id' => self::CLIENT_ID,
+                'client_secret' => self::CLIENT_SECRET,
+                'redirect_uri' => self::REDIRECT_URI,
+                'grant_type' => 'authorization_code',
+                'code' => 'test-code',
+            ]], $mockTokenResponse],
+        ]);
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        try {
+            $provider->getIdToken('test-code');
+        } catch (CodeException $thrown) {
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertInstanceOf(\JsonException::class, $thrown->getPrevious(), 'Original cause must be chained');
+
+            return;
+        }
+        $this->fail('Expected CodeException');
     }
 
     public function testGetIdTokenRejectsResponseWithoutStringIdToken(): void
     {
         $tokenEndpoint = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/token?p=test-policy';
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
 
@@ -619,7 +1210,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockHttpClient = $this->createStub(ClientInterface::class);
 
         $provider = new OpenIdConfigurationProvider([
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheItemPool' => $mockCacheItemPool,
             'clientId' => self::CLIENT_ID,
             'clientSecret' => self::CLIENT_SECRET,
@@ -630,6 +1221,40 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $authUrl = $provider->getBaseAuthorizationUrl();
         $this->assertSame($configuration['authorization_endpoint'], $authUrl);
+    }
+
+    /**
+     * A PSR-6 pool round-trips serialized values, so an entry written by
+     * another code path (or an older version of this library) can come back as
+     * an object rather than an array. The `(array)` cast in `getConfiguration()`
+     * absorbs that; without it PHP raises "Cannot use object of type stdClass
+     * as array" — a bare `\Error`, which is not part of the library's exception
+     * contract.
+     */
+    public function testGetConfigurationCacheHitWithObjectPayload(): void
+    {
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(true);
+        $mockCacheItem->method('get')->willReturn((object) $configuration);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $this->assertSame($configuration['authorization_endpoint'], $provider->getBaseAuthorizationUrl());
     }
 
     public function testGetConfigurationMissingKey(): void
@@ -651,7 +1276,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
 
         $provider = new OpenIdConfigurationProvider([
-            'openIDConnectMetadataUrl' => 'https://some.url/openid-configuration',
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
             'cacheItemPool' => $mockCacheItemPool,
             'clientId' => self::CLIENT_ID,
             'clientSecret' => self::CLIENT_SECRET,
@@ -669,7 +1294,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testFetchJsonResourceNon200(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockStream = $this->createStub(StreamInterface::class);
         $mockStream->method('getContents')->willReturn('');
@@ -698,14 +1323,14 @@ class OpenIdConfigurationProviderTest extends TestCase
         ]);
 
         $this->expectException(HttpException::class);
-        $this->expectExceptionMessage('Cannot access json resource');
+        $this->expectExceptionMessage('Cannot access json resource: https://provider.example.org/openid-configuration');
 
         $provider->getBaseAuthorizationUrl();
     }
 
     public function testFetchJsonResourceClientException(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockHttpClient = $this->createStub(ClientInterface::class);
         $exception = new class('Connection refused') extends \RuntimeException implements ClientExceptionInterface {
@@ -728,15 +1353,86 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
+        try {
+            $provider->getBaseAuthorizationUrl();
+        } catch (HttpException $thrown) {
+            $this->assertSame('Connection refused', $thrown->getMessage());
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertSame($exception, $thrown->getPrevious(), 'Original cause must be chained');
+
+            return;
+        }
+        $this->fail('Expected HttpException');
+    }
+
+    /**
+     * A body one byte over the limit is refused. Exercised through a response
+     * that reports no size, so it is the retrieved content that trips the cap.
+     */
+    public function testFetchJsonResourceRejectsOversizedContent(): void
+    {
+        $provider = $this->createProviderWithMetadataBody($this->discoveryDocumentOfExactByteSize(self::MAX_JSON_RESOURCE_BYTES + 1));
+
         $this->expectException(HttpException::class);
-        $this->expectExceptionMessage('Connection refused');
+        $this->expectExceptionMessage(sprintf(
+            'Json resource is larger than the %d byte limit (%d bytes): https://provider.example.org/openid-configuration',
+            self::MAX_JSON_RESOURCE_BYTES,
+            self::MAX_JSON_RESOURCE_BYTES + 1,
+        ));
 
         $provider->getBaseAuthorizationUrl();
     }
 
+    /**
+     * A body of exactly the limit is accepted and still parsed. Paired with the
+     * test above, this pins the comparison to the byte rather than leaving the
+     * boundary free.
+     */
+    public function testFetchJsonResourceAcceptsContentAtTheLimit(): void
+    {
+        $provider = $this->createProviderWithMetadataBody($this->discoveryDocumentOfExactByteSize(self::MAX_JSON_RESOURCE_BYTES));
+
+        $this->assertSame(
+            'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy',
+            $provider->getBaseAuthorizationUrl()
+        );
+    }
+
+    /**
+     * Where the response declares its size, that is checked before the body is
+     * retrieved at all — a chunked response declares none, which is why the
+     * content is checked too.
+     */
+    public function testFetchJsonResourceRejectsOversizedDeclaredSize(): void
+    {
+        $provider = $this->createProviderWithMetadataBody('{}', self::MAX_JSON_RESOURCE_BYTES + 1);
+
+        $this->expectException(HttpException::class);
+        $this->expectExceptionMessage(sprintf(
+            'Json resource is larger than the %d byte limit (%d bytes): https://provider.example.org/openid-configuration',
+            self::MAX_JSON_RESOURCE_BYTES,
+            self::MAX_JSON_RESOURCE_BYTES + 1,
+        ));
+
+        $provider->getBaseAuthorizationUrl();
+    }
+
+    public function testFetchJsonResourceAcceptsDeclaredSizeAtTheLimit(): void
+    {
+        $provider = $this->createProviderWithMetadataBody(
+            $this->discoveryDocumentOfExactByteSize(self::MAX_JSON_RESOURCE_BYTES),
+            self::MAX_JSON_RESOURCE_BYTES,
+        );
+
+        $this->assertSame(
+            'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy',
+            $provider->getBaseAuthorizationUrl()
+        );
+    }
+
     public function testFetchJsonResourceInvalidJson(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $mockStream = $this->createStub(StreamInterface::class);
         $mockStream->method('getContents')->willReturn('not valid json{{{');
@@ -764,15 +1460,21 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        $this->expectException(\ItkDev\OpenIdConnect\Exception\JsonException::class);
+        try {
+            $provider->getBaseAuthorizationUrl();
+        } catch (\ItkDev\OpenIdConnect\Exception\JsonException $thrown) {
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertInstanceOf(\JsonException::class, $thrown->getPrevious(), 'Original cause must be chained');
 
-        $provider->getBaseAuthorizationUrl();
+            return;
+        }
+        $this->fail('Expected JsonException');
     }
 
     public function testGetJwtVerificationKeysRejectsJwksMissingKeysArray(): void
     {
         $provider = $this->createProviderWithCustomJwks((string) json_encode(['something_else' => 1]));
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWKS payload missing array "keys" property (RFC 7517 §5)');
@@ -783,7 +1485,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetJwtVerificationKeysRejectsNonObjectJwkEntry(): void
     {
         $provider = $this->createProviderWithCustomJwks((string) json_encode(['keys' => [42]]));
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry is not a JSON object');
@@ -796,7 +1498,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks(
             (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 42]]]),
         );
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry missing string "kty" for key id: key-1');
@@ -809,7 +1511,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks(
             (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => 42, 'n' => 'abc']]]),
         );
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK RSA entry missing string "e"/"n" for key id: key-1');
@@ -817,9 +1519,97 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * An exponent of whitespace is a string, and base64-decodes to zero bytes,
+     * so it clears the is_string guard and reaches the key conversion. The
+     * emptiness check has to sit after the decode for exactly this reason.
+     */
+    public function testGetJwtVerificationKeysRejectsRsaWithEmptyExponent(): void
+    {
+        $provider = $this->createProviderWithCustomJwks(
+            (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => ' ', 'n' => 'abc']]]),
+        );
+        $this->overloadJwt();
+
+        $this->expectException(JwksException::class);
+        $this->expectExceptionMessage('JWK RSA entry has empty "e"/"n" for key id: key-1');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * As above, for the modulus.
+     */
+    public function testGetJwtVerificationKeysRejectsRsaWithEmptyModulus(): void
+    {
+        $provider = $this->createProviderWithCustomJwks(
+            (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => 'AQAB', 'n' => '']]]),
+        );
+        $this->overloadJwt();
+
+        $this->expectException(JwksException::class);
+        $this->expectExceptionMessage('JWK RSA entry has empty "e"/"n" for key id: key-1');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * An IdP publishing a private key clears every guard here — `kty` is RSA and
+     * `n`/`e` are well-formed — and is refused by `JWK::parseKey()` instead. The
+     * refusal must arrive as a `JwksException` with the cause chained, not as
+     * firebase's own `UnexpectedValueException`.
+     */
+    public function testGetJwtVerificationKeysWrapsUnusableKey(): void
+    {
+        $fixtureKeys = $this->loadMockFixture('mockOpenIDValidationKeys.json');
+        $this->assertIsArray($fixtureKeys['keys']);
+        $this->assertIsArray($fixtureKeys['keys'][0]);
+        $key = $fixtureKeys['keys'][0];
+        $kid = $key['kid'];
+        $this->assertIsString($kid);
+
+        $key['d'] = 'private-key-material';
+
+        $provider = $this->createProviderWithCustomJwks((string) json_encode(['keys' => [$key]]));
+        $this->overloadJwt();
+
+        try {
+            $provider->validateIdToken('token', self::NONCE);
+            $this->fail('Expected JwksException was not thrown');
+        } catch (JwksException $thrown) {
+            $this->assertSame(
+                sprintf('JWK entry for key id %s is not a usable key: RSA private keys are not supported', $kid),
+                $thrown->getMessage()
+            );
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertInstanceOf(\UnexpectedValueException::class, $thrown->getPrevious(), 'Original cause must be chained');
+        }
+    }
+
+    /**
+     * RFC 7517 §5 allows a JWK Set to carry members besides "keys". The document
+     * is now cached whole, so those members must survive the round trip — and
+     * "keys" is not necessarily the first of them.
+     */
+    public function testGetJwksDocumentKeepsAdditionalTopLevelMembers(): void
+    {
+        $fixtureKeys = $this->loadMockFixture('mockOpenIDValidationKeys.json');
+        $this->assertIsArray($fixtureKeys['keys']);
+
+        $provider = $this->createProviderWithCustomJwks(
+            (string) json_encode(['extra_member' => 'ignored', 'keys' => $fixtureKeys['keys']]),
+        );
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertSame(self::NONCE, $claims->nonce);
+    }
+
     public function testGetJwtVerificationKeysRejectsNonStringKid(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -855,8 +1645,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry missing string "kid" (RFC 7517 §4.5)');
@@ -866,7 +1655,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetJwtVerificationKeysUnsupportedKeyType(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -901,8 +1690,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('Unsupported key data for key id: ec-key-1');
@@ -912,11 +1700,11 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testGetJwtVerificationKeysCacheHit(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
-        $cachedKeys = ['key1' => new Key('public-key-data', 'RS256')];
+        $cachedJwks = $this->loadMockFixture('mockOpenIDValidationKeys.json');
 
         $configCacheItem = $this->createStub(CacheItemInterface::class);
         $configCacheItem->method('isHit')->willReturn(true);
@@ -924,7 +1712,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $jwksCacheItem = $this->createStub(CacheItemInterface::class);
         $jwksCacheItem->method('isHit')->willReturn(true);
-        $jwksCacheItem->method('get')->willReturn($cachedKeys);
+        $jwksCacheItem->method('get')->willReturn($cachedJwks);
 
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
         $mockCacheItemPool->method('getItem')->willReturnCallback(function (string $key) use ($configCacheItem, $jwksCacheItem) {
@@ -947,8 +1735,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
@@ -957,9 +1744,165 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertEquals(self::NONCE, $claims->nonce);
     }
 
+    /**
+     * As for the discovery document, a cached JWKS document can come back as an
+     * object. The `(array)` cast in `getJwksDocument()` absorbs it; without the
+     * cast the method returns an object from an `: array` return type and PHP
+     * raises a `TypeError`.
+     */
+    public function testGetJwtVerificationKeysCacheHitWithObjectPayload(): void
+    {
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
+
+        $configCacheItem = $this->createStub(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(true);
+        $configCacheItem->method('get')->willReturn($this->loadMockFixture('mockOpenIDConfiguration.json'));
+
+        $jwksCacheItem = $this->createStub(CacheItemInterface::class);
+        $jwksCacheItem->method('isHit')->willReturn(true);
+        $jwksCacheItem->method('get')->willReturn((object) $this->loadMockFixture('mockOpenIDValidationKeys.json'));
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturnCallback(
+            fn (string $key) => str_contains($key, 'jwks') ? $jwksCacheItem : $configCacheItem
+        );
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $this->createStub(ClientInterface::class),
+        ]);
+
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertEquals(self::NONCE, $claims->nonce);
+    }
+
+    public function testGetConfigurationCachesFetchedDocument(): void
+    {
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+
+        $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn($mockConfigResponse);
+
+        // On a cache miss the fetched discovery document must be stored with
+        // the configured cache duration, under the namespaced cache key.
+        $configCacheItem = $this->createMock(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(false);
+        $configCacheItem->expects($this->once())->method('set')->with($configuration)->willReturnSelf();
+        $configCacheItem->expects($this->once())->method('expiresAfter')->with(3600)->willReturnSelf();
+
+        $expectedCacheKey = 'itk-openid-connect-configuration-||'.hash('sha1', $openIDConnectMetadataUrl).'||configuration';
+
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool->expects($this->once())->method('getItem')->with($expectedCacheKey)->willReturn($configCacheItem);
+        $mockCacheItemPool->expects($this->once())->method('save')->with($configCacheItem)->willReturn(true);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+            'cacheDuration' => 3600,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $authUrl = $provider->getBaseAuthorizationUrl();
+        $this->assertSame('https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy', $authUrl);
+    }
+
+    public function testGetJwksDocumentCachesFetchedDocument(): void
+    {
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+
+        $mockKeysResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDValidationKeys.json');
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn($mockKeysResponse);
+
+        $configCacheItem = $this->createStub(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(true);
+        $configCacheItem->method('get')->willReturn($configuration);
+
+        // On a JWKS cache miss the fetched *document* must be stored with the
+        // configured cache duration and saved to the pool. The built Key objects
+        // are deliberately not cached: JWK::parseKey() wraps an
+        // OpenSSLAsymmetricKey, which PHP refuses to serialize.
+        $jwksCacheItem = $this->createMock(CacheItemInterface::class);
+        $jwksCacheItem->method('isHit')->willReturn(false);
+        $jwksCacheItem->expects($this->once())->method('set')
+            ->with($this->loadMockFixture('mockOpenIDValidationKeys.json'))
+            ->willReturnSelf();
+        $jwksCacheItem->expects($this->once())->method('expiresAfter')->with(3600)->willReturnSelf();
+
+        $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturnCallback(
+            static fn (string $key) => str_contains($key, 'jwks') ? $jwksCacheItem : $configCacheItem
+        );
+        $mockCacheItemPool->expects($this->once())->method('save')->with($jwksCacheItem)->willReturn(true);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+            'cacheDuration' => 3600,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertEquals(self::NONCE, $claims->nonce);
+    }
+
+    public function testGetJwtVerificationKeysBuildsAllJwksKeys(): void
+    {
+        // Two RSA keys in the JWKS: the full key map (not just the first
+        // entry) must reach JWT::decode, since the token's "kid" may match
+        // any key published by the IdP.
+        $fixtureKeys = $this->loadMockFixture('mockOpenIDValidationKeys.json');
+        $this->assertIsArray($fixtureKeys['keys']);
+        $this->assertIsArray($fixtureKeys['keys'][0]);
+        $template = $fixtureKeys['keys'][0];
+
+        $jwks = ['keys' => [
+            ['kid' => 'key-a'] + $template,
+            ['kid' => 'key-b'] + $template,
+        ]];
+        $provider = $this->createProviderWithCustomJwks((string) json_encode($jwks));
+
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->with(
+            \Mockery::type('string'),
+            \Mockery::on(static fn (array $keys): bool => 2 === count($keys)
+                && $keys['key-a'] instanceof Key
+                && $keys['key-b'] instanceof Key)
+        )->andReturn($this->getMockClaims());
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertEquals(self::NONCE, $claims->nonce);
+    }
+
     public function testGetConfigurationCacheInvalidArgument(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
 
         $exception = new class('Invalid cache key') extends \InvalidArgumentException implements \Psr\Cache\InvalidArgumentException {
         };
@@ -978,15 +1921,21 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        $this->expectException(CacheException::class);
-        $this->expectExceptionMessage('Invalid cache key');
+        try {
+            $provider->getBaseAuthorizationUrl();
+        } catch (CacheException $thrown) {
+            $this->assertSame('Invalid cache key', $thrown->getMessage());
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertSame($exception, $thrown->getPrevious(), 'Original cause must be chained');
 
-        $provider->getBaseAuthorizationUrl();
+            return;
+        }
+        $this->fail('Expected CacheException');
     }
 
     public function testGetJwtVerificationKeysCacheInvalidArgument(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
         $configCacheItem = $this->createStub(CacheItemInterface::class);
@@ -1017,15 +1966,21 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        $this->expectException(CacheException::class);
-        $this->expectExceptionMessage('Invalid jwks cache key');
+        try {
+            $provider->validateIdToken('token', self::NONCE);
+        } catch (CacheException $thrown) {
+            $this->assertSame('Invalid jwks cache key', $thrown->getMessage());
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertSame($exception, $thrown->getPrevious(), 'Original cause must be chained');
 
-        $provider->validateIdToken('token', self::NONCE);
+            return;
+        }
+        $this->fail('Expected CacheException');
     }
 
     public function testBase64urlDecodeFailure(): void
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -1061,11 +2016,10 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
 
         $this->expectException(\ItkDev\OpenIdConnect\Exception\DecodeException::class);
-        $this->expectExceptionMessage('Error url decoding input');
+        $this->expectExceptionMessage('Error url decoding input !!!');
 
         $provider->validateIdToken('token', self::NONCE);
     }
@@ -1083,6 +2037,104 @@ class OpenIdConfigurationProviderTest extends TestCase
      *
      * @return array<mixed> top-level decoded JSON; callers cast / narrow as needed
      */
+    /**
+     * Overload `Firebase\JWT\JWT` for the duration of the test.
+     *
+     * Callers stub `decode()` themselves. `urlsafeB64Decode()` has to keep
+     * working, because `JWK::parseKey()` — production code, reached while
+     * building keys from the JWKS — calls it; overloading the whole class would
+     * otherwise take that out along with `decode()`.
+     */
+    private function overloadJwt(): \Mockery\MockInterface
+    {
+        /** @var \Mockery\MockInterface $mockJWT */
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT->shouldReceive('urlsafeB64Decode')->andReturnUsing(
+            static fn (string $input): string => (string) base64_decode(strtr($input, '-_', '+/'), true)
+        );
+
+        return $mockJWT;
+    }
+
+    /**
+     * Build a provider whose metadata URL answers with the given raw body, on a
+     * cache miss so the fetch actually happens.
+     *
+     * @param int|null $declaredSize what the response reports as its body size;
+     *                               null models a chunked response
+     */
+    private function createProviderWithMetadataBody(string $body, ?int $declaredSize = null): OpenIdConfigurationProvider
+    {
+        $mockStream = $this->createStub(StreamInterface::class);
+        $mockStream->method('getContents')->willReturn($body);
+        $mockStream->method('getSize')->willReturn($declaredSize);
+
+        $mockResponse = $this->createStub(ResponseInterface::class);
+        $mockResponse->method('getStatusCode')->willReturn(200);
+        $mockResponse->method('getBody')->willReturn($mockStream);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn($mockResponse);
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        return new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+    }
+
+    /**
+     * Encode the discovery fixture, padded so the JSON is exactly $bytes long.
+     */
+    private function discoveryDocumentOfExactByteSize(int $bytes): string
+    {
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+        $configuration['pad'] = '';
+
+        $padding = $bytes - strlen((string) json_encode($configuration));
+        $this->assertGreaterThan(0, $padding, 'Requested size must exceed the fixture itself');
+
+        $configuration['pad'] = str_repeat('a', $padding);
+        $json = (string) json_encode($configuration);
+        $this->assertSame($bytes, strlen($json), 'Padding must land on the requested size exactly');
+
+        return $json;
+    }
+
+    /**
+     * Build an authorization URL with state and nonce supplied, and return its
+     * query parameters.
+     *
+     * @param array<string, string> $options extra authorization parameters
+     *
+     * @return array<int|string, array<mixed>|string> as parse_str() populates it
+     */
+    private function authorizationUrlQuery(array $options): array
+    {
+        $authUrl = $this->provider->getAuthorizationUrl($options + [
+            'state' => '12345678',
+            'nonce' => 'abcdefghij',
+        ]);
+
+        $queryString = parse_url($authUrl, PHP_URL_QUERY);
+        $this->assertIsString($queryString, 'Generated authorization URL must have a query string');
+
+        $query = [];
+        parse_str($queryString, $query);
+
+        return $query;
+    }
+
     private function loadMockFixture(string $filename): array
     {
         $path = __DIR__.'/../MockData/'.$filename;
@@ -1095,13 +2147,57 @@ class OpenIdConfigurationProviderTest extends TestCase
     }
 
     /**
+     * Build a provider whose discovery document is the standard fixture with
+     * the given keys replaced. Used by the endpoint scheme tests to feed
+     * deliberately-insecure endpoint URLs through `getSecureEndpoint`.
+     *
+     * The configuration is served from a cache hit, so no HTTP stub is needed
+     * for the metadata document itself; the JWKS fixture answers the one fetch
+     * that can still happen.
+     *
+     * @param array<string, string> $overrides Discovery document keys to replace
+     */
+    private function createProviderWithConfigurationOverrides(array $overrides, bool $allowHttp = false, string $clientId = self::CLIENT_ID): OpenIdConfigurationProvider
+    {
+        $configuration = array_merge($this->loadMockFixture('mockOpenIDConfiguration.json'), $overrides);
+
+        $configCacheItem = $this->createStub(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(true);
+        $configCacheItem->method('get')->willReturn($configuration);
+
+        $jwksCacheItem = $this->createStub(CacheItemInterface::class);
+        $jwksCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturnCallback(
+            fn (string $key) => str_contains($key, 'jwks') ? $jwksCacheItem : $configCacheItem
+        );
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn(
+            $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDValidationKeys.json')
+        );
+
+        return new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => $clientId,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+            'allowHttp' => $allowHttp,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+    }
+
+    /**
      * Build a provider whose JWKS endpoint returns the given raw JSON body.
      * Used by the JWKS validation tests to feed deliberately-malformed
      * payloads through `getJwtVerificationKeys`.
      */
     private function createProviderWithCustomJwks(string $jwksJson): OpenIdConfigurationProvider
     {
-        $openIDConnectMetadataUrl = 'https://some.url/openid-configuration';
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $jwks_uri = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/discovery/v2.0/keys?p=test-policy';
 
         $mockConfigResponse = $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDConfiguration.json');
@@ -1160,6 +2256,11 @@ class OpenIdConfigurationProviderTest extends TestCase
         // "issuer": "https://azure_b2c_test.b2clogin.com/11111111-1111-1111-1111-111111111111/v2.0/",
         $mockClaims->iss = 'https://azure_b2c_test.b2clogin.com/11111111-1111-1111-1111-111111111111/v2.0/';
         $mockClaims->nonce = self::NONCE;
+        // REQUIRED by OIDC Core §2 and asserted by validateIdToken(). The values
+        // are never compared — firebase/php-jwt does that during the decode,
+        // which is mocked out here — only their presence.
+        $mockClaims->exp = 2000000000;
+        $mockClaims->iat = 1000000000;
 
         return $mockClaims;
     }

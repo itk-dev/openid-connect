@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ItkDev\OpenIdConnect\Security;
 
+use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use ItkDev\OpenIdConnect\Exception\BadUrlException;
@@ -32,7 +33,6 @@ use Psr\Cache\CacheItemPoolInterface;
 use Psr\Cache\InvalidArgumentException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Message\ResponseInterface;
-use RobRichards\XMLSecLibs\XMLSecurityKey;
 
 /**
  * Class OpenIdConfigurationProvider.
@@ -42,6 +42,28 @@ use RobRichards\XMLSecLibs\XMLSecurityKey;
 class OpenIdConfigurationProvider extends AbstractProvider
 {
     private const string CACHE_KEY_PREFIX = 'itk-openid-connect-configuration-';
+
+    // The only signature algorithm this provider accepts. Passed to
+    // JWK::parseKey() as the default for JWKS entries that omit "alg", which is
+    // the common case (Azure AD B2C, Keycloak).
+    private const string SIGNING_ALGORITHM = 'RS256';
+
+    // Upper bound on the discovery document and the JWKS. Both are small — a
+    // few kilobytes in practice — so a mebibyte is generous while still keeping
+    // a hostile or misconfigured endpoint from handing us an unbounded body to
+    // decode and cache.
+    private const int MAX_JSON_RESOURCE_BYTES = 1048576;
+
+    // PKCE (RFC 7636). S256 is the only challenge method offered: "plain" is a
+    // downgrade with no reason to exist where sha256 is available.
+    //
+    // RFC 7636 §4.1 allows a verifier of 43 to 128 characters and servers must
+    // support the whole range, so the verifier is always generated at the
+    // maximum — a shorter one has nothing to recommend it. 96 random bytes
+    // base64url-encode to exactly 128 characters with no padding, which is why
+    // that byte count and no other.
+    private const string PKCE_CHALLENGE_METHOD = 'S256';
+    private const int PKCE_VERIFIER_BYTES = 96;
 
     // @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
     private const string POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
@@ -128,14 +150,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
+     * @throws BadUrlException
      * @throws CacheException
      * @throws HttpException
+     * @throws IllegalSchemeException
      * @throws JsonException
      * @throws MetadataException
      */
     public function getBaseAuthorizationUrl(): string
     {
-        return $this->getConfiguration('authorization_endpoint');
+        return $this->getSecureEndpoint('authorization_endpoint');
     }
 
     /**
@@ -155,9 +179,25 @@ class OpenIdConfigurationProvider extends AbstractProvider
             throw new MissingParameterException('Required parameter "nonce" missing');
         }
 
-        // Add default options scope, response_type and response_mode
+        // PKCE (RFC 7636) is opt-in: passing a code_challenge turns it on. The
+        // method is filled in here because omitting it makes the server assume
+        // "plain" (RFC 7636 §4.3), which would silently downgrade an S256
+        // challenge to a value sent in the clear.
+        if (!empty($options['code_challenge'])) {
+            $options += ['code_challenge_method' => self::PKCE_CHALLENGE_METHOD];
+        }
+
+        // Add default response_type and response_mode. The `scope` default is
+        // supplied by getDefaultScopes() via league's
+        // getAuthorizationParameters(), so it is not repeated here.
+        //
+        // DEPRECATED DEFAULT: `id_token` is the OIDC implicit flow, and the
+        // `query` response mode exists to make the token readable server-side —
+        // OIDC Core §3.2.2.5 returns implicit-flow parameters in the fragment,
+        // so this relies on a provider extension and puts a credential in access
+        // logs. Callers should pass `response_type => 'code'` and exchange via
+        // getIdToken(). The default becomes `code` in 6.0.
         return parent::getAuthorizationUrl($options + [
-            'scope' => 'openid',
             'response_type' => 'id_token',
             'response_mode' => 'query',
         ]);
@@ -175,14 +215,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @return string The Url to redirect the client to for session logout
      *
+     * @throws BadUrlException
      * @throws CacheException
      * @throws HttpException
+     * @throws IllegalSchemeException
      * @throws JsonException
      * @throws MetadataException
      */
     public function getEndSessionUrl(?string $postLogoutRedirectUri = null, ?string $state = null, ?string $idToken = null): string
     {
-        $url = $this->getConfiguration('end_session_endpoint');
+        $url = $this->getSecureEndpoint('end_session_endpoint');
 
         $params = [];
         if ($postLogoutRedirectUri) {
@@ -208,13 +250,19 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Do any required verification of the id token and return an array of decoded claims.
      *
-     * Note: The "exp" (expiration) claim is validated by firebase/php-jwt during
-     * JWT::decode(), using the configured leeway for clock skew tolerance.
+     * The "exp" (expiration) claim is validated by firebase/php-jwt during
+     * JWT::decode(), using the configured leeway for clock skew tolerance. It is
+     * only validated when present, so this method additionally asserts that
+     * "exp" and "iat" exist — both REQUIRED by OIDC Core §2 — which is what
+     * stops a token without "exp" from never expiring.
      *
-     * Note: JWT::$leeway is a static property, so in environments with multiple
-     * OpenIdConfigurationProvider instances (e.g. multi-tenant setups in long-running
-     * processes), the leeway value set by the last provider to call validateIdToken()
-     * will apply globally until overwritten.
+     * "aud", "iss" and "nonce" are checked here. The nonce comparison is
+     * constant-time: it is the only claim compared against a value the caller
+     * holds, so a timing signal would leak that secret.
+     *
+     * Note: the leeway is applied through a process-global static in
+     * firebase/php-jwt, so with several providers configured differently the
+     * value belongs to whichever called last. See decodeWithLeeway().
      *
      * @param string $idToken Raw id token
      * @param string $nonce   Nonce
@@ -234,28 +282,117 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         try {
             $keys = $this->getJwtVerificationKeys();
-            // NB: JWT::$leeway is a static property shared across all instances.
-            // Always set it immediately before decode to ensure the correct value.
-            JWT::$leeway = $this->leeway;
-            /** @var \stdClass&object{aud: string|array<string>, iss: string, nonce: string} $claims */
-            $claims = JWT::decode($idToken, $keys);
+            $claims = $this->decodeWithLeeway($idToken, $keys);
+
+            // "exp" and "iat" are REQUIRED by OIDC Core §2, but
+            // firebase/php-jwt only validates them when they are present — a
+            // token without "exp" never expires. Presence is asserted here so
+            // the decode above is what enforces the deadline.
+            self::requireNumericClaim($claims, 'exp');
+            self::requireNumericClaim($claims, 'iat');
+
             // "aud" may be an array of strings or a single string
             // (cf. https://openid.net/specs/openid-connect-core-1_0.html#IDToken).
-            $audiences = (array) $claims->aud;
-            if (!in_array($this->clientId, $audiences)) {
+            // Non-string entries are dropped: they cannot match a string client
+            // id under strict comparison, and would turn the message below into
+            // an "Array to string conversion".
+            $audiences = array_filter((array) $claims->aud, 'is_string');
+            if (!in_array($this->clientId, $audiences, true)) {
                 throw new ClaimsException('ID token has incorrect audience(s): '.implode(', ', $audiences));
             }
-            if ($claims->iss !== $this->getConfiguration('issuer')) {
-                throw new ClaimsException('ID token has incorrect issuer: '.$claims->iss);
+
+            $issuer = self::requireStringClaim($claims, 'iss');
+            if ($issuer !== $this->getConfiguration('issuer')) {
+                throw new ClaimsException('ID token has incorrect issuer: '.$issuer);
             }
-            if ($claims->nonce !== $nonce) {
-                throw new ClaimsException('ID token has incorrect nonce: '.$claims->nonce);
+
+            // Compared in constant time: the nonce is the one claim checked
+            // against a value the caller holds, so a timing signal here would
+            // leak that secret rather than a public identifier.
+            $claimedNonce = self::requireStringClaim($claims, 'nonce');
+            if (!hash_equals($nonce, $claimedNonce)) {
+                throw new ClaimsException('ID token has incorrect nonce: '.$claimedNonce);
             }
 
             return $claims;
         } catch (\UnexpectedValueException $e) {
             throw new ValidationException('ID token validation failed: '.$e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * Decode an ID token, applying the configured leeway.
+     *
+     * INVARIANT: firebase/php-jwt exposes leeway only as `JWT::$leeway`, a
+     * process-global static with no per-call alternative, so this method is the
+     * single place that writes it. Nothing may come between the write and
+     * `JWT::decode()` that could suspend — no HTTP, no cache read, no I/O of any
+     * kind. That is why the verification keys are resolved by the caller before
+     * this is entered, and why this method does nothing else.
+     *
+     * Under PHP-FPM, where a request owns its process, that ordering is a
+     * formality. Under cooperative concurrency it is what stops a fiber from
+     * decoding with a sibling provider's leeway, and under a preemptive model it
+     * would not be sufficient at all. Revisit before adopting FrankenPHP
+     * workers or any other long-lived concurrent runtime.
+     *
+     * The previous value is restored afterwards. Under FPM the mutated static
+     * dies with the request either way, but in a worker it would persist for the
+     * life of the process and silently apply to any other firebase/php-jwt
+     * consumer in it that never sets its own leeway. Writing a process-global is
+     * unavoidable here; leaving it written is not.
+     *
+     * @param array<string, Key> $keys Verification keys, indexed by JWK `kid`
+     *
+     * @return \stdClass The token's payload, as JWT::decode() returns it
+     *
+     * @throws \UnexpectedValueException from JWT::decode(), wrapped by the caller
+     */
+    private function decodeWithLeeway(string $idToken, array $keys): \stdClass
+    {
+        $previousLeeway = JWT::$leeway;
+        JWT::$leeway = $this->leeway;
+
+        try {
+            return JWT::decode($idToken, $keys);
+        } finally {
+            JWT::$leeway = $previousLeeway;
+        }
+    }
+
+    /**
+     * Assert that a claim is present and numeric.
+     *
+     * Presence only — the value itself is validated by firebase/php-jwt during
+     * the decode, using the configured leeway.
+     *
+     * @throws ClaimsException
+     */
+    private static function requireNumericClaim(object $claims, string $name): void
+    {
+        if (!isset($claims->{$name}) || !is_numeric($claims->{$name})) {
+            throw new ClaimsException(sprintf('ID token missing required numeric "%s" claim (OIDC Core §2)', $name));
+        }
+    }
+
+    /**
+     * Assert that a claim is present and a non-empty string, and return it.
+     *
+     * Returning the narrowed value keeps the callers from re-reading an
+     * arbitrarily typed property, which is what made string concatenation in
+     * their exception messages unsafe.
+     *
+     * @throws ClaimsException
+     */
+    private static function requireStringClaim(object $claims, string $name): string
+    {
+        $value = $claims->{$name} ?? null;
+
+        if (!is_string($value) || '' === $value) {
+            throw new ClaimsException(sprintf('ID token missing required string "%s" claim', $name));
+        }
+
+        return $value;
     }
 
     /**
@@ -267,18 +404,27 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @throws OpenIdConnectExceptionInterface
      */
-    public function getIdToken(string $code): string
+    public function getIdToken(string $code, ?string $codeVerifier = null): string
     {
         try {
-            $endpoint = $this->getConfiguration('token_endpoint');
+            $endpoint = $this->getSecureEndpoint('token_endpoint');
+
+            $params = [
+                'client_id' => $this->clientId,
+                'client_secret' => $this->clientSecret,
+                'redirect_uri' => $this->redirectUri,
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+            ];
+
+            // Sent only when the caller holds one. An unsolicited code_verifier
+            // is an error to a server that issued no challenge.
+            if (null !== $codeVerifier) {
+                $params['code_verifier'] = $codeVerifier;
+            }
+
             $response = $this->getHttpClient()->request('POST', $endpoint, [
-                'form_params' => [
-                    'client_id' => $this->clientId,
-                    'client_secret' => $this->clientSecret,
-                    'redirect_uri' => $this->redirectUri,
-                    'grant_type' => 'authorization_code',
-                    'code' => $code,
-                ],
+                'form_params' => $params,
             ]);
 
             $payload = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
@@ -288,11 +434,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
             }
 
             return $payload['id_token'];
-        } catch (IdentityProviderException|ClientExceptionInterface|\JsonException $e) {
-            // Narrow boundary: IdentityProviderException from league's checkResponse,
-            // ClientExceptionInterface from Guzzle, \JsonException from json_decode.
-            // Other failures (e.g. CacheException from getConfiguration) propagate
-            // as their own concrete OpenIdConnectExceptionInterface subtypes.
+        } catch (ClientExceptionInterface|\JsonException $e) {
+            // Narrow boundary: ClientExceptionInterface from Guzzle,
+            // \JsonException from json_decode. This method issues the token
+            // request directly rather than through league's getParsedResponse(),
+            // so checkResponse() — and with it IdentityProviderException — is
+            // never on this path. Other failures (e.g. CacheException from
+            // getSecureEndpoint) propagate as their own concrete
+            // OpenIdConnectExceptionInterface subtypes.
             throw new CodeException('Get ID token failed: '.$e->getMessage(), 0, $e);
         }
     }
@@ -300,6 +449,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Generates a new random string to use as the state parameter in an
      * authorization flow.
+     *
+     * The value is also stored on the provider, so the inherited `getState()`
+     * returns it. Do not read it back from there. `getAuthorizationUrl()` writes
+     * the same property whether or not this method is used, so on a provider
+     * instance shared between requests — a long-running worker, or a container
+     * that memoizes the service — it holds whichever request wrote it last,
+     * which may belong to another user. The caller must persist the state
+     * itself, in the session, and compare against that.
      *
      * @param int $length Length of the random string to be generated
      *
@@ -316,6 +473,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the nonce parameter in an
      * authorization flow.
      *
+     * Nothing is stored on the provider: the caller is the only holder of this
+     * value, which is the contract the state parameter should be treated as
+     * having too.
+     *
      * @param int $length Length of the random string to be generated
      *
      * @return string The generated nonce
@@ -325,14 +486,67 @@ class OpenIdConfigurationProvider extends AbstractProvider
         return parent::getRandomState($length);
     }
 
-    public function getBaseAccessTokenUrl(array $params): string
+    /**
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
+    /**
+     * Generate a PKCE code verifier (RFC 7636 §4.1).
+     *
+     * Nothing is stored on the provider. As with `generateNonce()`, the caller
+     * is the only holder — and here that is not merely tidy. league's own PKCE
+     * support keeps the verifier on the provider instance, which on an instance
+     * shared between requests (a long-running worker, or a container that
+     * memoizes the service) would let one request's verifier be sent for
+     * another's token exchange. Persist this in the session next to the state
+     * and the nonce, and hand it back to `getIdToken()`.
+     *
+     * The length is not configurable: RFC 7636 caps the verifier at 128
+     * characters and requires servers to accept that, so there is no reason to
+     * ask for less entropy.
+     *
+     * @return string A 128-character code verifier
+     */
+    public function generatePkceVerifier(): string
     {
-        return $this->getConfiguration('token_endpoint');
+        return self::base64urlEncode(random_bytes(self::PKCE_VERIFIER_BYTES));
     }
 
+    /**
+     * Derive the S256 code challenge for a verifier (RFC 7636 §4.2).
+     *
+     * A pure function of its argument: no provider state is read or written, so
+     * the verifier never comes to rest on this object.
+     *
+     * @param string $verifier The code verifier to derive a challenge for
+     *
+     * @return string The S256 challenge, for the `code_challenge` authorization parameter
+     */
+    public function getPkceChallenge(string $verifier): string
+    {
+        return self::base64urlEncode(hash('sha256', $verifier, true));
+    }
+
+    public function getBaseAccessTokenUrl(array $params): string
+    {
+        return $this->getSecureEndpoint('token_endpoint');
+    }
+
+    /**
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
     public function getResourceOwnerDetailsUrl(AccessToken $token): string
     {
-        return $this->getConfiguration('userinfo_endpoint');
+        return $this->getSecureEndpoint('userinfo_endpoint');
     }
 
     /**
@@ -372,58 +586,111 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function getJwtVerificationKeys(): array
     {
-        $cacheKey = $this->getCacheKey('jwks');
+        $jwks = $this->getJwksDocument();
+
+        if (!isset($jwks['keys']) || !is_array($jwks['keys'])) {
+            throw new JwksException('JWKS payload missing array "keys" property (RFC 7517 §5)');
+        }
 
         $keys = [];
+
+        foreach ($jwks['keys'] as $key) {
+            if (!is_array($key)) {
+                throw new JwksException('JWK entry is not a JSON object');
+            }
+            if (!is_string($key['kid'] ?? null)) {
+                throw new JwksException('JWK entry missing string "kid" (RFC 7517 §4.5)');
+            }
+            $kid = $key['kid'];
+            if (!is_string($key['kty'] ?? null)) {
+                throw new JwksException('JWK entry missing string "kty" for key id: '.$kid);
+            }
+            if ('RSA' !== $key['kty']) {
+                throw new JwksException('Unsupported key data for key id: '.$kid);
+            }
+            if (!is_string($key['e'] ?? null) || !is_string($key['n'] ?? null)) {
+                throw new JwksException('JWK RSA entry missing string "e"/"n" for key id: '.$kid);
+            }
+
+            // These guards stay in front of JWK::parseKey() rather than
+            // delegating to it: firebase/php-jwt accepts a non-string, empty or
+            // undecodable exponent and builds a key from it, so dropping them
+            // would undo the strict JWKS validation 5.0.0 introduced. Emptiness
+            // is checked on the decoded bytes because "", " " and "\n" all
+            // base64-decode to zero bytes.
+            $e = self::base64urlDecode($key['e']);
+            $n = self::base64urlDecode($key['n']);
+            if ('' === $e || '' === $n) {
+                throw new JwksException('JWK RSA entry has empty "e"/"n" for key id: '.$kid);
+            }
+
+            try {
+                $parsed = JWK::parseKey($key, self::SIGNING_ALGORITHM);
+            } catch (\UnexpectedValueException|\InvalidArgumentException|\DomainException $exception) {
+                throw new JwksException(sprintf('JWK entry for key id %s is not a usable key: %s', $kid, $exception->getMessage()), 0, $exception);
+            }
+
+            // parseKey() is typed `?Key` because it returns null for key types
+            // it does not handle — all of which the "RSA" check above has
+            // already rejected, so this cannot be null here.
+            assert($parsed instanceof Key);
+
+            $keys[$kid] = $parsed;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Get the IdP's JWKS document, cached for `cacheDuration` seconds.
+     *
+     * The document is cached rather than the `Key` objects built from it:
+     * `JWK::parseKey()` returns keys wrapping an `OpenSSLAsymmetricKey`, which
+     * PHP refuses to serialize, so they cannot go into a PSR-6 pool. Parsing on
+     * each call costs microseconds and the network fetch is still cached.
+     *
+     * @return array The JWKS document
+     *
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
+    private function getJwksDocument(): array
+    {
+        // Deliberately not the 5.0 cache key: entries written by 5.0 hold
+        // serialized `Key` objects, and reading those as a JWKS document would
+        // fail until they expired.
+        $cacheKey = $this->getCacheKey('jwks-document');
 
         try {
             assert($this->cacheItemPool instanceof CacheItemPoolInterface);
             $item = $this->cacheItemPool->getItem($cacheKey);
 
             if ($item->isHit()) {
-                /** @var array<string, Key> $keys (we only ever store this shape) */
-                $keys = (array) $item->get();
-            } else {
-                $keysUri = $this->getConfiguration('jwks_uri');
-                $jwks = $this->fetchJsonResource($keysUri);
-
-                if (!isset($jwks['keys']) || !is_array($jwks['keys'])) {
-                    throw new JwksException('JWKS payload missing array "keys" property (RFC 7517 §5)');
-                }
-
-                foreach ($jwks['keys'] as $key) {
-                    if (!is_array($key)) {
-                        throw new JwksException('JWK entry is not a JSON object');
-                    }
-                    if (!is_string($key['kid'] ?? null)) {
-                        throw new JwksException('JWK entry missing string "kid" (RFC 7517 §4.5)');
-                    }
-                    $kid = $key['kid'];
-                    if (!is_string($key['kty'] ?? null)) {
-                        throw new JwksException('JWK entry missing string "kty" for key id: '.$kid);
-                    }
-                    if ('RSA' === $key['kty']) {
-                        if (!is_string($key['e'] ?? null) || !is_string($key['n'] ?? null)) {
-                            throw new JwksException('JWK RSA entry missing string "e"/"n" for key id: '.$kid);
-                        }
-                        $e = self::base64urlDecode($key['e']);
-                        $n = self::base64urlDecode($key['n']);
-                        $publicKey = XMLSecurityKey::convertRSA($n, $e);
-                        $keys[$kid] = new Key($publicKey, 'RS256');
-                    } else {
-                        throw new JwksException('Unsupported key data for key id: '.$kid);
-                    }
-                }
-
-                $item->set($keys);
-                $item->expiresAfter($this->cacheDuration);
-                $this->cacheItemPool->save($item);
+                return (array) $item->get();
             }
+
+            $jwks = $this->fetchJsonResource($this->getSecureEndpoint('jwks_uri'));
+
+            $item->set($jwks);
+            $item->expiresAfter($this->cacheDuration);
+            $this->cacheItemPool->save($item);
+
+            return $jwks;
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage(), 0, $e);
         }
+    }
 
-        return $keys;
+    /**
+     * Encode base 64 url, without padding (RFC 7515 §2).
+     */
+    private static function base64urlEncode(string $input): string
+    {
+        return rtrim(strtr(base64_encode($input), '+/', '-_'), '=');
     }
 
     /**
@@ -445,6 +712,17 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Fetch remote json resource.
      *
+     * Both resources this fetches — the discovery document and the JWKS — are
+     * capped at MAX_JSON_RESOURCE_BYTES. The declared body size is checked first
+     * where the response reports one, and the retrieved content unconditionally,
+     * because a chunked response reports no size.
+     *
+     * The cap bounds what gets decoded and written to the cache, not peak
+     * memory: Guzzle has already buffered the body by the time it is visible
+     * here. Bounding the transfer itself would mean a streaming read against a
+     * `stream => true` request, which is a larger change than the exposure
+     * warrants for a document fetched from a configured host over TLS.
+     *
      * @return array Json decoded to array
      *
      * @throws HttpException
@@ -459,7 +737,18 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 throw new HttpException('Cannot access json resource: '.$resourceUrl);
             }
 
-            $content = $response->getBody()->getContents();
+            $body = $response->getBody();
+            $declaredSize = $body->getSize();
+
+            if (null !== $declaredSize && $declaredSize > self::MAX_JSON_RESOURCE_BYTES) {
+                throw new HttpException($this->oversizedResourceMessage($resourceUrl, $declaredSize));
+            }
+
+            $content = $body->getContents();
+
+            if (strlen($content) > self::MAX_JSON_RESOURCE_BYTES) {
+                throw new HttpException($this->oversizedResourceMessage($resourceUrl, strlen($content)));
+            }
 
             /** @var array $resource */
             $resource = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
@@ -470,6 +759,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
         } catch (\JsonException $e) {
             throw new JsonException($e->getMessage(), 0, $e);
         }
+    }
+
+    private function oversizedResourceMessage(string $resourceUrl, int $size): string
+    {
+        return sprintf(
+            'Json resource is larger than the %d byte limit (%d bytes): %s',
+            self::MAX_JSON_RESOURCE_BYTES,
+            $size,
+            $resourceUrl,
+        );
     }
 
     /**
@@ -511,6 +810,34 @@ class OpenIdConfigurationProvider extends AbstractProvider
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * Get an endpoint URL from the discovery document, enforcing the scheme policy.
+     *
+     * `allowHttp` governs every URL this client talks to, not just the metadata
+     * URL it was configured with. A tampered or misconfigured discovery
+     * document announcing `http://…/token` would otherwise get the client
+     * secret posted in plaintext.
+     *
+     * @param string $key The discovery document key
+     *
+     * @return string The endpoint URL for the given key
+     *
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
+    private function getSecureEndpoint(string $key): string
+    {
+        $url = $this->getConfiguration($key);
+
+        $this->assertSecureUrl($url, sprintf('OIDC discovery document "%s"', $key));
+
+        return $url;
     }
 
     private function getCacheKey(string $name): string
@@ -577,16 +904,31 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function setOpenIDConnectMetadataUrl(string $url): void
     {
-        $scheme = parse_url($url, PHP_URL_SCHEME);
-
-        if (null === $scheme) {
-            throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: '.$url);
-        }
-
-        if (!$this->allowHttp && 'https' !== $scheme) {
-            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: '.$url);
-        }
+        $this->assertSecureUrl($url, 'OpenIDConnectMetadataUrl');
 
         $this->openIDConnectMetadataUrl = $url;
+    }
+
+    /**
+     * Assert that a URL is one this client is willing to talk to.
+     *
+     * @param string $url     The URL to check
+     * @param string $subject What the URL is, for the exception message
+     *
+     * @throws BadUrlException        If the URL has no parsable scheme
+     * @throws IllegalSchemeException If the scheme is not https and `allowHttp` is false
+     */
+    private function assertSecureUrl(string $url, string $subject): void
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+
+        if (!is_string($scheme)) {
+            throw new BadUrlException($subject.' is invalid: '.$url);
+        }
+
+        // Schemes are case-insensitive (RFC 3986 §3.1), so "HTTPS://" is valid.
+        if (!$this->allowHttp && 'https' !== strtolower($scheme)) {
+            throw new IllegalSchemeException($subject.' must use https: '.$url);
+        }
     }
 }

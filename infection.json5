@@ -1,0 +1,80 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": ["src"]
+    },
+    "threads": "max",
+    // Minimum mutation score, enforced locally and in CI. Every mutant that
+    // can be killed by a meaningful test is killed, and the handful that are
+    // provably equivalent are excluded under "mutators" below with the reason
+    // stated — so the score is 100 and the threshold is binding. A new escaped
+    // mutant fails the build instead of being absorbed by headroom.
+    //
+    // Because --logger-github annotates every escaped mutant in src/ (with no
+    // notion of what a PR changed), holding this at 100 also keeps pull
+    // requests free of annotations unless they genuinely regress the score.
+    //
+    // A threshold this tight is only safe while the mutator set is pinned: a
+    // future infection/infection minor may add mutators and turn CI red, which
+    // is a deliberate prompt to kill or exclude the newcomers rather than to
+    // lower the number.
+    "minMsi": 100,
+    "minCoveredMsi": 100,
+    "logs": {
+        "text": "infection.log",
+        "html": "infection.html",
+        // Publishes results for the develop branch to the Stryker dashboard
+        // (feeds the README badge). Requires STRYKER_DASHBOARD_API_KEY; only
+        // active on CI, skipped locally and on non-matching branches.
+        "stryker": {
+            "report": "develop"
+        }
+    },
+    // Exclusions are for mutants whose output is indistinguishable from the
+    // original — not for mutants that are merely inconvenient to test. Each
+    // one below states why no test could observe the difference.
+    "mutators": {
+        "@default": true,
+        "IncrementInteger": {
+            // getRandomState() does bin2hex(random_bytes($length / 2)), so a
+            // 33-character request produces the same 32 characters as 32 does.
+            // The decrement (31 -> 30 characters) is observable and is killed
+            // by the default-length tests.
+            "ignore": [
+                "ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider::generateState",
+                "ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider::generateNonce"
+            ],
+            // json_decode()'s depth argument is PHP's own default, passed only
+            // because JSON_THROW_ON_ERROR follows it positionally. Telling 511
+            // from 513 needs a payload nested exactly 512 levels deep, which no
+            // IdP would send.
+            "ignoreSourceCodeByRegex": [".*json_decode\\(.*"]
+        },
+        "DecrementInteger": {
+            // As above, for the depth argument.
+            "ignoreSourceCodeByRegex": [".*json_decode\\(.*"]
+        },
+        "Catch_": {
+            // getJwtVerificationKeys() catches the three SPL types
+            // JWK::parseKey() documents. Only UnexpectedValueException is
+            // reachable through it: our own guards run first, so the "JWK must
+            // not be empty" InvalidArgumentException cannot fire, and
+            // DomainException is raised only by the EC/OKP branches the "RSA"
+            // check excludes, or by an openssl_pkey_get_public() failure that no
+            // input reproduces here. Dropping either arm would let a bare SPL
+            // exception escape a public method, so the breadth is deliberate
+            // even though no test can reach it.
+            "ignore": [
+                "ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider::getJwtVerificationKeys"
+            ]
+        },
+        "CastString": {
+            // (string) on getStatusCode(): IdentityProviderException types
+            // $message as mixed and league's file has no strict_types, so
+            // Exception coerces the int identically with or without the cast.
+            "ignore": [
+                "ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider::checkResponse"
+            ]
+        }
+    }
+}

@@ -5,6 +5,7 @@
 [![PHP Version](https://img.shields.io/packagist/php-v/itk-dev/openid-connect.svg?style=flat-square&colorB=%238892BF)](https://www.php.net/downloads)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/itk-dev/openid-connect/php.yaml?branch=develop&label=CI&logo=github&style=flat-square)](https://github.com/itk-dev/openid-connect/actions/workflows/php.yaml?query=branch%3Adevelop)
 [![Codecov Code Coverage](https://img.shields.io/codecov/c/gh/itk-dev/openid-connect?label=codecov&logo=codecov&style=flat-square)](https://codecov.io/gh/itk-dev/openid-connect)
+[![Mutation Score](https://img.shields.io/endpoint?style=flat-square&label=mutation%20score&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fitk-dev%2Fopenid-connect%2Fdevelop)](https://dashboard.stryker-mutator.io/reports/github.com/itk-dev/openid-connect/develop)
 [![Read License](https://img.shields.io/packagist/l/itk-dev/openid-connect.svg?style=flat-square&colorB=darkcyan)](https://github.com/itk-dev/openid-connect/blob/master/LICENSE.md)
 [![Package downloads on Packagist](https://img.shields.io/packagist/dt/itk-dev/openid-connect.svg?style=flat-square&colorB=darkmagenta)](https://packagist.org/packages/itk-dev/openid-connect/stats)
 
@@ -16,7 +17,11 @@ but should be usable for other OpenID Connect providers.
 
 ## References
 
+* [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
+* [OpenID Connect Basic Client Implementer's Guide 1.0](https://openid.net/specs/openid-connect-basic-1_0.html)
+  — the authorization code flow
 * [OpenID Connect Implicit Client Implementer's Guide 1.0](https://openid.net/specs/openid-connect-implicit-1_0.html)
+  — the current `response_type` default, deprecated; see below
 * [Azure Active Directory B2C documentation](https://docs.microsoft.com/en-us/azure/active-directory-b2c/)
 * [Web sign-in with OpenID Connect in Azure Active Directory B2C](https://docs.microsoft.com/en-us/azure/active-directory-b2c/openid-connect#send-authentication-requests)
 
@@ -65,9 +70,9 @@ require_once __DIR__.'/vendor/autoload.php';
 use ItkDev\OpenIdConnect\Security\OpenIdConfigurationProvider;
 
 $provider = new OpenIdConfigurationProvider([
-    'redirectUri' => 'https://some.url', // Absolute url to where the user is redirected after a successful login
-    'openIDConnectMetadataUrl' => 'https:/.../openid-configuration', // url to OpenId Discovery document
-    'cacheItemPool' => 'Psr6/CacheItemPoolInterface', // Implementation of CacheItemPoolInterface for caching above discovery document
+    'redirectUri' => 'https://app.example.org', // Absolute url to where the user is redirected after a successful login
+    'openIDConnectMetadataUrl' => 'https://provider.example.org/.well-known/openid-configuration', // url to OpenId Discovery document
+    'cacheItemPool' => $cacheItemPool, // A Psr\Cache\CacheItemPoolInterface instance, for caching the discovery document and the JWKS
     'clientId' => 'client_id', // Client id assigned by authorizer
     'clientSecret' => 'client_secret', // Client password assigned by authorizer
     // optional values
@@ -76,6 +81,20 @@ $provider = new OpenIdConfigurationProvider([
     'allowHttp' => true, // Defaults to false. Allow OIDC urls with http scheme. Use only during development!
 ]);
 ```
+
+##### Scheme enforcement
+
+`allowHttp` governs every URL the client talks to, not just
+`openIDConnectMetadataUrl`. The `authorization_endpoint`, `token_endpoint`,
+`userinfo_endpoint`, `end_session_endpoint` and `jwks_uri` read from the IdP's
+discovery document are held to the same policy: with `allowHttp` at its default
+`false`, a document announcing any of them over plain http raises
+`IllegalSchemeException` before the URL is used. Without that check, a tampered
+or misconfigured document could have the client secret posted in plaintext
+during the code exchange.
+
+Set `allowHttp` when developing against an IdP without TLS — a local Keycloak,
+say. Never in production.
 
 ##### HTTP timeout, proxy, and TLS verification
 
@@ -114,7 +133,7 @@ Defaults to 10 seconds
 
 For more information see the following:
 
-* [firebase/php-jwt](https://github.com/firebase/php-jwt#example)
+* [firebase/php-jwt](https://github.com/googleapis/php-jwt#example)
   Last entry in the example mentions the leeway option.
 
 * [JWT documentation](http://self-issued.info/docs/draft-ietf-oauth-json-web-token.html#nbfDef)
@@ -158,13 +177,90 @@ $authUrl = $provider->getAuthorizationUrl(['state' => $state, 'nonce' => $nonce]
 // redirect to $authUrl
 ```
 
-Note that the default response type and mode
-is set in ```OpenIdConfigurationProvider.php```
+##### The session is the only store for "state" and "nonce"
+
+The snippet above is the contract, not just one way of writing it: the caller
+persists both values and compares against its own copy on the way back.
+
+`AbstractProvider` also keeps the state on the provider object, so the inherited
+`getState()` returns it — `getAuthorizationUrl()` writes that property whether or
+not `generateState()` is used. **Do not read the state back from the provider.**
+Where the provider is constructed per request that is merely redundant, but on a
+shared instance — a long-running worker such as FrankenPHP or Swoole, or a
+container that memoizes the service — the property holds whichever request wrote
+it last, which may belong to a different user. `generateNonce()` stores nothing,
+and the state is best treated as though it did the same.
+
+##### Response type: pass `code` explicitly
+
+`getAuthorizationUrl()` currently defaults to
 
 ```php
 'response_type' => 'id_token',
 'response_mode' => 'query',
 ```
+
+which is the OIDC implicit flow with the ID token delivered in the query string.
+**Pass `'response_type' => 'code'` and exchange the code with `getIdToken()`
+instead.** The default will become `code` in 6.0; passing it explicitly now is
+both the recommended flow and forward-compatible.
+
+Two reasons to move:
+
+* OIDC Core [§3.2.2.5](https://openid.net/specs/openid-connect-core-1_0.html)
+  specifies that implicit-flow parameters are returned in the _fragment_. A
+  fragment never reaches the server, so the `response_mode => 'query'` default
+  exists to make the ID token readable server-side — a provider extension
+  (Azure AD B2C supports it) rather than something the spec describes.
+* That puts a credential in the query string, where it reaches web server access
+  logs and browser history.
+
+[RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) §2.1.2 recommends `code`
+over response types that return tokens in the authorization response. Its
+normative sentence names access tokens, so it does not literally cover a bare
+`id_token` response — but `code` is the flow it points at, and the one
+[openid-connect-bundle](https://github.com/itk-dev/openid-connect-bundle) uses.
+
+##### PKCE (RFC 7636)
+
+PKCE is opt-in, and there is no configuration flag: passing a `code_challenge`
+turns it on, omitting it changes nothing.
+
+The verifier is a secret and belongs in the session alongside the state and the
+nonce. Only its challenge may reach the authorization request.
+
+```php
+// Authorization request
+$verifier = $provider->generatePkceVerifier();
+$session->set('oauth2pkce', $verifier);
+
+$authUrl = $provider->getAuthorizationUrl([
+    'state' => $state,
+    'nonce' => $nonce,
+    'response_type' => 'code',
+    'code_challenge' => $provider->getPkceChallenge($verifier),
+]);
+```
+
+`code_challenge_method=S256` is filled in for you. Omitting it would make the
+server assume `plain` (RFC 7636 §4.3) and treat the challenge as a value sent in
+the clear, so it is not left to the caller to remember.
+
+On the way back, hand the verifier to the code exchange:
+
+```php
+$verifier = $session->get('oauth2pkce');
+$session->remove('oauth2pkce');
+
+$idToken = $provider->getIdToken($request->query->get('code'), $verifier);
+$claims = $provider->validateIdToken($idToken, $session->get('oauth2nonce'));
+```
+
+`generatePkceVerifier()` stores nothing on the provider, which is deliberate.
+`league/oauth2-client` keeps its own verifier on the provider object; on an
+instance shared between requests that would let one request's verifier be sent
+for another request's exchange — the same hazard as reading `getState()` back.
+The session is the only place the verifier should live.
 
 #### Verify authorized requests
 
@@ -179,21 +275,31 @@ values
 // Validate that the request state and session state match
 $sessionState = $this->session->get('oauth2state');
 $this->session->remove('oauth2state');
-if (!$sessionState || $request->query->get('state') !== $sessionState) {
+if (!is_string($sessionState) || !hash_equals($sessionState, (string) $request->query->get('state'))) {
     throw new ValidationException('Invalid state');
 }
 
-// Validate the id token. This will validate the token against the keys published by the
-// provider (Azure AD B2C). If the token is invalid or the nonce doesn't match an
-// exception will be thrown.
+// Exchange the code for an id token, then validate it. Validation checks the
+// signature against the keys published by the provider (Azure AD B2C), requires
+// the "exp" and "iat" claims that OIDC Core §2 makes mandatory, and checks
+// "aud", "iss" and "nonce". Any failure throws.
 try {
-    $claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
+    $idToken = $provider->getIdToken($request->query->get('code'));
+    $claims = $provider->validateIdToken($idToken, $session->get('oauth2nonce'));
     // Authentication successful
 } catch (OpenIdConnectExceptionInterface $exception) {
     // Handle failed authentication
 } finally {
     $this->session->remove('oauth2nonce');
 }
+```
+
+With PKCE, pass the stored verifier to `getIdToken()` as shown above. With the
+deprecated `id_token` response type there is no code to exchange and the token
+arrives in the query instead:
+
+```php
+$claims = $provider->validateIdToken($request->query->get('id_token'), $session->get('oauth2nonce'));
 ```
 
 ### Exception handling
@@ -252,7 +358,9 @@ This starts the Docker containers and installs Composer dependencies.
 
 ### Running All CI Checks
 
-To run all checks locally (coding standards, static analysis, tests):
+To run all checks locally (composer validation, coding standards, static
+analysis at the dependency ceiling and floor, the test matrix, and mutation
+testing):
 
 ```shell
 task pr:actions
@@ -261,8 +369,12 @@ task pr:actions
 ### Unit Testing
 
 ```shell
-task test
+task test:coverage
 ```
+
+`phpunit.xml.dist` declares coverage reports, so the suite needs
+`XDEBUG_MODE=coverage`; `task test:coverage` sets it. `task test` runs PHPUnit
+without it and reports no executed tests.
 
 ### Test Matrix
 
@@ -278,13 +390,47 @@ pass/fail results.
 
 The test suite uses [Mockery](https://github.com/mockery/mockery) to mock
 [public static methods](http://docs.mockery.io/en/latest/reference/public_static_properties.html?highlight=static)
-in 3rd party libraries like the `JWT::decode` method from `firebase/jwt`.
+in 3rd party libraries like the `JWT::decode` method from `firebase/php-jwt`.
+
+### Mutation Testing
+
+Line coverage shows which code the tests _execute_; mutation testing shows
+which code they actually _verify_. [Infection](https://infection.github.io/)
+applies small changes (mutants) to the source code — flipping a comparison,
+removing a method call — and runs the test suite against each one. If the
+tests still pass, the mutant "escaped": a potential bug the tests would not
+catch.
+
+```shell
+task test:mutation
+```
+
+The minimum mutation score (`minMsi` and `minCoveredMsi`, both 100) is defined
+in `infection.json5` and enforced both locally and in CI — no command line flags
+needed. Mutants that no test could distinguish are excluded per mutator there,
+with the reason recorded, so the threshold stays binding. CI
+annotates escaped mutants inline on pull requests, and results for `develop`
+are published to the
+[Stryker dashboard](https://dashboard.stryker-mutator.io/reports/github.com/itk-dev/openid-connect/develop),
+which also feeds the mutation score badge above. Detailed reports are written
+to `infection.log` and `infection.html` on each run.
 
 ### PHPStan Static Analysis
 
 ```shell
-task analyze
+task analyze:php
 ```
+
+`phpstan.neon` pins the analysis to the whole `php ^8.3` range that
+`composer.json` declares, so the result does not depend on the PHP version it
+runs on. The dependency floor is a separate axis, covered by its own job:
+
+```shell
+task analyze:php:lowest
+```
+
+That lowers only the packages `require` names — leaving the dev tooling current
+— analyses, and restores the ceiling afterwards.
 
 ### Coding Standards
 

@@ -132,6 +132,21 @@ tasks:
         cmds:
             - "{{.PHP}} vendor/bin/phpstan"
 
+    analyze:php:lowest:
+        # Lowers only the packages `require` names, so the dev tooling stays
+        # current: a plain --prefer-lowest drags PHPUnit and phpstan-mockery
+        # down too, and then most of what is reported is an artefact of that
+        # rather than a statement about the runtime dependencies.
+        #
+        # The deferred `composer update` restores the ceiling even when the
+        # analysis fails, so this leaves the container as it found it. Analysis
+        # only — never run a formatter against the downgraded vendor.
+        desc: Run PHPStan against the declared dependency floor
+        cmds:
+            - defer: "{{.COMPOSER}} update -q"
+            - "{{.PHP}} sh -c 'composer update -q --prefer-lowest --with-all-dependencies $(composer show --direct --no-dev --name-only)'"
+            - "{{.PHP}} vendor/bin/phpstan"
+
     # Testing
 
     test:
@@ -143,6 +158,11 @@ tasks:
         desc: Run tests with coverage
         cmds:
             - "{{.DOCKER_COMPOSE}} exec -e XDEBUG_MODE=coverage phpfpm vendor/bin/phpunit --coverage-text --coverage-clover=coverage/unit.xml"
+
+    test:mutation:
+        desc: Run Infection mutation testing (threshold configured in infection.json5)
+        cmds:
+            - "{{.DOCKER_COMPOSE}} exec -e XDEBUG_MODE=coverage phpfpm vendor/bin/infection"
 
     test:run:
         desc: "Run tests for a PHP version and dependency set (e.g. task test:run PHP=8.4 DEPS=lowest)"
@@ -279,4 +299,6 @@ tasks:
             - task: composer:check
             - task: lint
             - task: analyze:php
+            - task: analyze:php:lowest
             - task: test:matrix
+            - task: test:mutation
