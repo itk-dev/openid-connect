@@ -54,6 +54,20 @@
             // As above, for the depth argument.
             "ignoreSourceCodeByRegex": [".*json_decode\\(.*"]
         },
+        "Catch_": {
+            // getJwtVerificationKeys() catches the three SPL types
+            // JWK::parseKey() documents. Only UnexpectedValueException is
+            // reachable through it: our own guards run first, so the "JWK must
+            // not be empty" InvalidArgumentException cannot fire, and
+            // DomainException is raised only by the EC/OKP branches the "RSA"
+            // check excludes, or by an openssl_pkey_get_public() failure that no
+            // input reproduces here. Dropping either arm would let a bare SPL
+            // exception escape a public method, so the breadth is deliberate
+            // even though no test can reach it.
+            "ignore": [
+                "ItkDev\\OpenIdConnect\\Security\\OpenIdConfigurationProvider::getJwtVerificationKeys"
+            ]
+        },
         "CastString": {
             // (string) on getStatusCode(): IdentityProviderException types
             // $message as mixed and league's file has no strict_types, so

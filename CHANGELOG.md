@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Dependency on `robrichards/xmlseclibs`. JWKS entries are converted to
+  verification keys by `firebase/php-jwt`'s own `JWK::parseKey()`, which this
+  library already depended on, instead of `XMLSecurityKey::convertRSA()`. Also
+  drops the `phpseclib/phpseclib` subtree that `xmlseclibs` 4.0 brought with it.
+  The strict JWKS validation from 5.0.0 is unchanged and still runs ahead of
+  `parseKey()`, which on its own accepts a non-string, empty or undecodable
+  exponent, coerces a non-string `kid`, and raises a bare `\TypeError` on a
+  non-object entry
+
 ### Added
 
 - Mutation testing with [Infection](https://infection.github.io/)
@@ -39,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newly escaped mutant fails the build rather than being absorbed by headroom,
   and pull requests stay free of `--logger-github` annotations unless they
   genuinely regress the score
+- The JWKS cache now holds the discovery-fetched JWKS document rather than the
+  `Key` objects built from it, under a new cache key (`…||jwks-document`).
+  `JWK::parseKey()` returns keys wrapping an `OpenSSLAsymmetricKey`, which PHP
+  refuses to serialize, so they cannot go into a PSR-6 pool; the document is
+  cached instead and parsed on each call, which costs microseconds and keeps the
+  network fetch cached exactly as before. Entries written by 5.0 under the old
+  `…||jwks` key are left untouched rather than misread, and expire on their own
 - PHPStan analyses the whole PHP range `composer.json` declares (`phpVersion`
   8.3–8.5 in `phpstan.neon`) rather than whichever version the job happens to
   run on, and the main job runs on PHP 8.5 so it resolves the newest installable

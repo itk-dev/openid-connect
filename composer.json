@@ -24,8 +24,7 @@
         "firebase/php-jwt": "^7.0",
         "league/oauth2-client": "^2.8.1",
         "psr/cache": "^2.0 || ^3.0",
-        "psr/http-client": "^1.0",
-        "robrichards/xmlseclibs": "^4.0"
+        "psr/http-client": "^1.0"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.50",

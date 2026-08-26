@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ItkDev\OpenIdConnect\Security;
 
+use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use ItkDev\OpenIdConnect\Exception\BadUrlException;
@@ -32,7 +33,6 @@ use Psr\Cache\CacheItemPoolInterface;
 use Psr\Cache\InvalidArgumentException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Message\ResponseInterface;
-use RobRichards\XMLSecLibs\XMLSecurityKey;
 
 /**
  * Class OpenIdConfigurationProvider.
@@ -42,6 +42,11 @@ use RobRichards\XMLSecLibs\XMLSecurityKey;
 class OpenIdConfigurationProvider extends AbstractProvider
 {
     private const string CACHE_KEY_PREFIX = 'itk-openid-connect-configuration-';
+
+    // The only signature algorithm this provider accepts. Passed to
+    // JWK::parseKey() as the default for JWKS entries that omit "alg", which is
+    // the common case (Azure AD B2C, Keycloak).
+    private const string SIGNING_ALGORITHM = 'RS256';
 
     // @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
     private const string POST_LOGOUT_REDIRECT_URI = 'post_logout_redirect_uri';
@@ -396,67 +401,103 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function getJwtVerificationKeys(): array
     {
-        $cacheKey = $this->getCacheKey('jwks');
+        $jwks = $this->getJwksDocument();
+
+        if (!isset($jwks['keys']) || !is_array($jwks['keys'])) {
+            throw new JwksException('JWKS payload missing array "keys" property (RFC 7517 §5)');
+        }
 
         $keys = [];
+
+        foreach ($jwks['keys'] as $key) {
+            if (!is_array($key)) {
+                throw new JwksException('JWK entry is not a JSON object');
+            }
+            if (!is_string($key['kid'] ?? null)) {
+                throw new JwksException('JWK entry missing string "kid" (RFC 7517 §4.5)');
+            }
+            $kid = $key['kid'];
+            if (!is_string($key['kty'] ?? null)) {
+                throw new JwksException('JWK entry missing string "kty" for key id: '.$kid);
+            }
+            if ('RSA' !== $key['kty']) {
+                throw new JwksException('Unsupported key data for key id: '.$kid);
+            }
+            if (!is_string($key['e'] ?? null) || !is_string($key['n'] ?? null)) {
+                throw new JwksException('JWK RSA entry missing string "e"/"n" for key id: '.$kid);
+            }
+
+            // These guards stay in front of JWK::parseKey() rather than
+            // delegating to it: firebase/php-jwt accepts a non-string, empty or
+            // undecodable exponent and builds a key from it, so dropping them
+            // would undo the strict JWKS validation 5.0.0 introduced. Emptiness
+            // is checked on the decoded bytes because "", " " and "\n" all
+            // base64-decode to zero bytes.
+            $e = self::base64urlDecode($key['e']);
+            $n = self::base64urlDecode($key['n']);
+            if ('' === $e || '' === $n) {
+                throw new JwksException('JWK RSA entry has empty "e"/"n" for key id: '.$kid);
+            }
+
+            try {
+                $parsed = JWK::parseKey($key, self::SIGNING_ALGORITHM);
+            } catch (\UnexpectedValueException|\InvalidArgumentException|\DomainException $exception) {
+                throw new JwksException(sprintf('JWK entry for key id %s is not a usable key: %s', $kid, $exception->getMessage()), 0, $exception);
+            }
+
+            // parseKey() is typed `?Key` because it returns null for key types
+            // it does not handle — all of which the "RSA" check above has
+            // already rejected, so this cannot be null here.
+            assert($parsed instanceof Key);
+
+            $keys[$kid] = $parsed;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Get the IdP's JWKS document, cached for `cacheDuration` seconds.
+     *
+     * The document is cached rather than the `Key` objects built from it:
+     * `JWK::parseKey()` returns keys wrapping an `OpenSSLAsymmetricKey`, which
+     * PHP refuses to serialize, so they cannot go into a PSR-6 pool. Parsing on
+     * each call costs microseconds and the network fetch is still cached.
+     *
+     * @return array The JWKS document
+     *
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
+    private function getJwksDocument(): array
+    {
+        // Deliberately not the 5.0 cache key: entries written by 5.0 hold
+        // serialized `Key` objects, and reading those as a JWKS document would
+        // fail until they expired.
+        $cacheKey = $this->getCacheKey('jwks-document');
 
         try {
             assert($this->cacheItemPool instanceof CacheItemPoolInterface);
             $item = $this->cacheItemPool->getItem($cacheKey);
 
             if ($item->isHit()) {
-                /** @var array<string, Key> $keys (we only ever store this shape) */
-                $keys = (array) $item->get();
-            } else {
-                $keysUri = $this->getSecureEndpoint('jwks_uri');
-                $jwks = $this->fetchJsonResource($keysUri);
-
-                if (!isset($jwks['keys']) || !is_array($jwks['keys'])) {
-                    throw new JwksException('JWKS payload missing array "keys" property (RFC 7517 §5)');
-                }
-
-                foreach ($jwks['keys'] as $key) {
-                    if (!is_array($key)) {
-                        throw new JwksException('JWK entry is not a JSON object');
-                    }
-                    if (!is_string($key['kid'] ?? null)) {
-                        throw new JwksException('JWK entry missing string "kid" (RFC 7517 §4.5)');
-                    }
-                    $kid = $key['kid'];
-                    if (!is_string($key['kty'] ?? null)) {
-                        throw new JwksException('JWK entry missing string "kty" for key id: '.$kid);
-                    }
-                    if ('RSA' === $key['kty']) {
-                        if (!is_string($key['e'] ?? null) || !is_string($key['n'] ?? null)) {
-                            throw new JwksException('JWK RSA entry missing string "e"/"n" for key id: '.$kid);
-                        }
-                        $e = self::base64urlDecode($key['e']);
-                        $n = self::base64urlDecode($key['n']);
-                        // Checked after decoding, not before: "" but also " "
-                        // and "\n" all base64-decode to zero bytes. xmlseclibs
-                        // 4.0 answers an empty modulus or exponent with a bare
-                        // \Exception, which would escape this method without
-                        // implementing OpenIdConnectExceptionInterface; 3.1.5
-                        // was worse and silently built a key from nothing.
-                        if ('' === $e || '' === $n) {
-                            throw new JwksException('JWK RSA entry has empty "e"/"n" for key id: '.$kid);
-                        }
-                        $publicKey = XMLSecurityKey::convertRSA($n, $e);
-                        $keys[$kid] = new Key($publicKey, 'RS256');
-                    } else {
-                        throw new JwksException('Unsupported key data for key id: '.$kid);
-                    }
-                }
-
-                $item->set($keys);
-                $item->expiresAfter($this->cacheDuration);
-                $this->cacheItemPool->save($item);
+                return (array) $item->get();
             }
+
+            $jwks = $this->fetchJsonResource($this->getSecureEndpoint('jwks_uri'));
+
+            $item->set($jwks);
+            $item->expiresAfter($this->cacheDuration);
+            $this->cacheItemPool->save($item);
+
+            return $jwks;
         } catch (InvalidArgumentException $e) {
             throw new CacheException($e->getMessage(), 0, $e);
         }
-
-        return $keys;
     }
 
     /**

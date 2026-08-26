@@ -281,8 +281,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenSuccess(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
 
         // Assert that 'decode' is called as decode(<string>, [<string>, <Firebase\JWT\Key>])
@@ -305,8 +304,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenFailure(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockJWT->shouldReceive('decode')->andThrow(SignatureInvalidException::class, 'Signature verification failed');
 
         try {
@@ -323,8 +321,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenAudience(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = 'incorrect aud';
 
@@ -338,8 +335,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenIssuer(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->iss = 'incorrect iss';
 
@@ -353,8 +349,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenNonce(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->nonce = 'incorrect nonce';
 
@@ -636,8 +631,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenArrayAudience(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = [self::CLIENT_ID, 'other_client'];
 
@@ -652,8 +646,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
     public function testValidateIdTokenArrayAudienceInvalid(): void
     {
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockClaims->aud = ['wrong_client_1', 'wrong_client_2'];
 
@@ -1075,7 +1068,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetJwtVerificationKeysRejectsJwksMissingKeysArray(): void
     {
         $provider = $this->createProviderWithCustomJwks((string) json_encode(['something_else' => 1]));
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWKS payload missing array "keys" property (RFC 7517 §5)');
@@ -1086,7 +1079,7 @@ class OpenIdConfigurationProviderTest extends TestCase
     public function testGetJwtVerificationKeysRejectsNonObjectJwkEntry(): void
     {
         $provider = $this->createProviderWithCustomJwks((string) json_encode(['keys' => [42]]));
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry is not a JSON object');
@@ -1099,7 +1092,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks(
             (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 42]]]),
         );
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry missing string "kty" for key id: key-1');
@@ -1112,7 +1105,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks(
             (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => 42, 'n' => 'abc']]]),
         );
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK RSA entry missing string "e"/"n" for key id: key-1');
@@ -1130,7 +1123,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks(
             (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => ' ', 'n' => 'abc']]]),
         );
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK RSA entry has empty "e"/"n" for key id: key-1');
@@ -1146,12 +1139,66 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider = $this->createProviderWithCustomJwks(
             (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => 'AQAB', 'n' => '']]]),
         );
-        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK RSA entry has empty "e"/"n" for key id: key-1');
 
         $provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * An IdP publishing a private key clears every guard here — `kty` is RSA and
+     * `n`/`e` are well-formed — and is refused by `JWK::parseKey()` instead. The
+     * refusal must arrive as a `JwksException` with the cause chained, not as
+     * firebase's own `UnexpectedValueException`.
+     */
+    public function testGetJwtVerificationKeysWrapsUnusableKey(): void
+    {
+        $fixtureKeys = $this->loadMockFixture('mockOpenIDValidationKeys.json');
+        $this->assertIsArray($fixtureKeys['keys']);
+        $this->assertIsArray($fixtureKeys['keys'][0]);
+        $key = $fixtureKeys['keys'][0];
+        $kid = $key['kid'];
+        $this->assertIsString($kid);
+
+        $key['d'] = 'private-key-material';
+
+        $provider = $this->createProviderWithCustomJwks((string) json_encode(['keys' => [$key]]));
+        $this->overloadJwt();
+
+        try {
+            $provider->validateIdToken('token', self::NONCE);
+            $this->fail('Expected JwksException was not thrown');
+        } catch (JwksException $thrown) {
+            $this->assertSame(
+                sprintf('JWK entry for key id %s is not a usable key: RSA private keys are not supported', $kid),
+                $thrown->getMessage()
+            );
+            $this->assertSame(0, $thrown->getCode());
+            $this->assertInstanceOf(\UnexpectedValueException::class, $thrown->getPrevious(), 'Original cause must be chained');
+        }
+    }
+
+    /**
+     * RFC 7517 §5 allows a JWK Set to carry members besides "keys". The document
+     * is now cached whole, so those members must survive the round trip — and
+     * "keys" is not necessarily the first of them.
+     */
+    public function testGetJwksDocumentKeepsAdditionalTopLevelMembers(): void
+    {
+        $fixtureKeys = $this->loadMockFixture('mockOpenIDValidationKeys.json');
+        $this->assertIsArray($fixtureKeys['keys']);
+
+        $provider = $this->createProviderWithCustomJwks(
+            (string) json_encode(['extra_member' => 'ignored', 'keys' => $fixtureKeys['keys']]),
+        );
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertSame(self::NONCE, $claims->nonce);
     }
 
     public function testGetJwtVerificationKeysRejectsNonStringKid(): void
@@ -1192,8 +1239,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('JWK entry missing string "kid" (RFC 7517 §4.5)');
@@ -1238,8 +1284,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
 
         $this->expectException(JwksException::class);
         $this->expectExceptionMessage('Unsupported key data for key id: ec-key-1');
@@ -1253,7 +1298,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
 
-        $cachedKeys = ['key1' => new Key('public-key-data', 'RS256')];
+        $cachedJwks = $this->loadMockFixture('mockOpenIDValidationKeys.json');
 
         $configCacheItem = $this->createStub(CacheItemInterface::class);
         $configCacheItem->method('isHit')->willReturn(true);
@@ -1261,7 +1306,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $jwksCacheItem = $this->createStub(CacheItemInterface::class);
         $jwksCacheItem->method('isHit')->willReturn(true);
-        $jwksCacheItem->method('get')->willReturn($cachedKeys);
+        $jwksCacheItem->method('get')->willReturn($cachedJwks);
 
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
         $mockCacheItemPool->method('getItem')->willReturnCallback(function (string $key) use ($configCacheItem, $jwksCacheItem) {
@@ -1284,8 +1329,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockClaims = $this->getMockClaims();
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
 
@@ -1295,10 +1339,10 @@ class OpenIdConfigurationProviderTest extends TestCase
     }
 
     /**
-     * As for the discovery document, a cached JWKS map can come back as an
-     * object. The `(array)` cast in `getJwtVerificationKeys()` absorbs it;
-     * without the cast the method returns an object from an `: array` return
-     * type and PHP raises a `TypeError`.
+     * As for the discovery document, a cached JWKS document can come back as an
+     * object. The `(array)` cast in `getJwksDocument()` absorbs it; without the
+     * cast the method returns an object from an `: array` return type and PHP
+     * raises a `TypeError`.
      */
     public function testGetJwtVerificationKeysCacheHitWithObjectPayload(): void
     {
@@ -1310,7 +1354,7 @@ class OpenIdConfigurationProviderTest extends TestCase
 
         $jwksCacheItem = $this->createStub(CacheItemInterface::class);
         $jwksCacheItem->method('isHit')->willReturn(true);
-        $jwksCacheItem->method('get')->willReturn((object) ['key1' => new Key('public-key-data', 'RS256')]);
+        $jwksCacheItem->method('get')->willReturn((object) $this->loadMockFixture('mockOpenIDValidationKeys.json'));
 
         $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
         $mockCacheItemPool->method('getItem')->willReturnCallback(
@@ -1327,8 +1371,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $this->createStub(ClientInterface::class),
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
 
         /** @var object{nonce: string} $claims */
@@ -1373,7 +1416,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertSame('https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/authorize?p=test-policy', $authUrl);
     }
 
-    public function testGetJwtVerificationKeysCachesFetchedKeys(): void
+    public function testGetJwksDocumentCachesFetchedDocument(): void
     {
         $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
         $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
@@ -1386,14 +1429,15 @@ class OpenIdConfigurationProviderTest extends TestCase
         $configCacheItem->method('isHit')->willReturn(true);
         $configCacheItem->method('get')->willReturn($configuration);
 
-        // On a JWKS cache miss the built Key map must be stored with the
-        // configured cache duration and saved to the pool.
+        // On a JWKS cache miss the fetched *document* must be stored with the
+        // configured cache duration and saved to the pool. The built Key objects
+        // are deliberately not cached: JWK::parseKey() wraps an
+        // OpenSSLAsymmetricKey, which PHP refuses to serialize.
         $jwksCacheItem = $this->createMock(CacheItemInterface::class);
         $jwksCacheItem->method('isHit')->willReturn(false);
-        $jwksCacheItem->expects($this->once())->method('set')->with($this->callback(
-            static fn (array $keys): bool => 1 === count($keys)
-                && $keys['111111111111111111111111111111111111111111'] instanceof Key
-        ))->willReturnSelf();
+        $jwksCacheItem->expects($this->once())->method('set')
+            ->with($this->loadMockFixture('mockOpenIDValidationKeys.json'))
+            ->willReturnSelf();
         $jwksCacheItem->expects($this->once())->method('expiresAfter')->with(3600)->willReturnSelf();
 
         $mockCacheItemPool = $this->createMock(CacheItemPoolInterface::class);
@@ -1413,8 +1457,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
 
         /** @var object{nonce: string} $claims */
@@ -1438,8 +1481,7 @@ class OpenIdConfigurationProviderTest extends TestCase
         ]];
         $provider = $this->createProviderWithCustomJwks((string) json_encode($jwks));
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
         $mockJWT->shouldReceive('decode')->with(
             \Mockery::type('string'),
             \Mockery::on(static fn (array $keys): bool => 2 === count($keys)
@@ -1568,8 +1610,7 @@ class OpenIdConfigurationProviderTest extends TestCase
             'httpClient' => $mockHttpClient,
         ]);
 
-        /** @var \Mockery\MockInterface $mockJWT */
-        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT = $this->overloadJwt();
 
         $this->expectException(\ItkDev\OpenIdConnect\Exception\DecodeException::class);
         $this->expectExceptionMessage('Error url decoding input !!!');
@@ -1590,6 +1631,25 @@ class OpenIdConfigurationProviderTest extends TestCase
      *
      * @return array<mixed> top-level decoded JSON; callers cast / narrow as needed
      */
+    /**
+     * Overload `Firebase\JWT\JWT` for the duration of the test.
+     *
+     * Callers stub `decode()` themselves. `urlsafeB64Decode()` has to keep
+     * working, because `JWK::parseKey()` — production code, reached while
+     * building keys from the JWKS — calls it; overloading the whole class would
+     * otherwise take that out along with `decode()`.
+     */
+    private function overloadJwt(): \Mockery\MockInterface
+    {
+        /** @var \Mockery\MockInterface $mockJWT */
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT->shouldReceive('urlsafeB64Decode')->andReturnUsing(
+            static fn (string $input): string => (string) base64_decode(strtr($input, '-_', '+/'), true)
+        );
+
+        return $mockJWT;
+    }
+
     private function loadMockFixture(string $filename): array
     {
         $path = __DIR__.'/../MockData/'.$filename;
