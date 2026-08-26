@@ -128,14 +128,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
     }
 
     /**
+     * @throws BadUrlException
      * @throws CacheException
      * @throws HttpException
+     * @throws IllegalSchemeException
      * @throws JsonException
      * @throws MetadataException
      */
     public function getBaseAuthorizationUrl(): string
     {
-        return $this->getConfiguration('authorization_endpoint');
+        return $this->getSecureEndpoint('authorization_endpoint');
     }
 
     /**
@@ -175,14 +177,16 @@ class OpenIdConfigurationProvider extends AbstractProvider
      *
      * @return string The Url to redirect the client to for session logout
      *
+     * @throws BadUrlException
      * @throws CacheException
      * @throws HttpException
+     * @throws IllegalSchemeException
      * @throws JsonException
      * @throws MetadataException
      */
     public function getEndSessionUrl(?string $postLogoutRedirectUri = null, ?string $state = null, ?string $idToken = null): string
     {
-        $url = $this->getConfiguration('end_session_endpoint');
+        $url = $this->getSecureEndpoint('end_session_endpoint');
 
         $params = [];
         if ($postLogoutRedirectUri) {
@@ -270,7 +274,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     public function getIdToken(string $code): string
     {
         try {
-            $endpoint = $this->getConfiguration('token_endpoint');
+            $endpoint = $this->getSecureEndpoint('token_endpoint');
             $response = $this->getHttpClient()->request('POST', $endpoint, [
                 'form_params' => [
                     'client_id' => $this->clientId,
@@ -325,14 +329,30 @@ class OpenIdConfigurationProvider extends AbstractProvider
         return parent::getRandomState($length);
     }
 
+    /**
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
     public function getBaseAccessTokenUrl(array $params): string
     {
-        return $this->getConfiguration('token_endpoint');
+        return $this->getSecureEndpoint('token_endpoint');
     }
 
+    /**
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
     public function getResourceOwnerDetailsUrl(AccessToken $token): string
     {
-        return $this->getConfiguration('userinfo_endpoint');
+        return $this->getSecureEndpoint('userinfo_endpoint');
     }
 
     /**
@@ -384,7 +404,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
                 /** @var array<string, Key> $keys (we only ever store this shape) */
                 $keys = (array) $item->get();
             } else {
-                $keysUri = $this->getConfiguration('jwks_uri');
+                $keysUri = $this->getSecureEndpoint('jwks_uri');
                 $jwks = $this->fetchJsonResource($keysUri);
 
                 if (!isset($jwks['keys']) || !is_array($jwks['keys'])) {
@@ -513,6 +533,34 @@ class OpenIdConfigurationProvider extends AbstractProvider
         }
     }
 
+    /**
+     * Get an endpoint URL from the discovery document, enforcing the scheme policy.
+     *
+     * `allowHttp` governs every URL this client talks to, not just the metadata
+     * URL it was configured with. A tampered or misconfigured discovery
+     * document announcing `http://…/token` would otherwise get the client
+     * secret posted in plaintext.
+     *
+     * @param string $key The discovery document key
+     *
+     * @return string The endpoint URL for the given key
+     *
+     * @throws BadUrlException
+     * @throws CacheException
+     * @throws HttpException
+     * @throws IllegalSchemeException
+     * @throws JsonException
+     * @throws MetadataException
+     */
+    private function getSecureEndpoint(string $key): string
+    {
+        $url = $this->getConfiguration($key);
+
+        $this->assertSecureUrl($url, sprintf('OIDC discovery document "%s"', $key));
+
+        return $url;
+    }
+
     private function getCacheKey(string $name): string
     {
         return implode('||', [
@@ -577,16 +625,31 @@ class OpenIdConfigurationProvider extends AbstractProvider
      */
     private function setOpenIDConnectMetadataUrl(string $url): void
     {
-        $scheme = parse_url($url, PHP_URL_SCHEME);
-
-        if (null === $scheme) {
-            throw new BadUrlException('OpenIDConnectMetadataUrl is invalid: '.$url);
-        }
-
-        if (!$this->allowHttp && 'https' !== $scheme) {
-            throw new IllegalSchemeException('OpenIDConnectMetadataUrl must use https: '.$url);
-        }
+        $this->assertSecureUrl($url, 'OpenIDConnectMetadataUrl');
 
         $this->openIDConnectMetadataUrl = $url;
+    }
+
+    /**
+     * Assert that a URL is one this client is willing to talk to.
+     *
+     * @param string $url     The URL to check
+     * @param string $subject What the URL is, for the exception message
+     *
+     * @throws BadUrlException        If the URL has no parsable scheme
+     * @throws IllegalSchemeException If the scheme is not https and `allowHttp` is false
+     */
+    private function assertSecureUrl(string $url, string $subject): void
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+
+        if (!is_string($scheme)) {
+            throw new BadUrlException($subject.' is invalid: '.$url);
+        }
+
+        // Schemes are case-insensitive (RFC 3986 §3.1), so "HTTPS://" is valid.
+        if (!$this->allowHttp && 'https' !== strtolower($scheme)) {
+            throw new IllegalSchemeException($subject.' must use https: '.$url);
+        }
     }
 }

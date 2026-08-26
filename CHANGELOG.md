@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `allowHttp` now governs every URL the client talks to, not just
+  `openIDConnectMetadataUrl`. The `authorization_endpoint`, `token_endpoint`,
+  `userinfo_endpoint`, `end_session_endpoint` and `jwks_uri` read from the IdP's
+  discovery document are validated against the same scheme policy and raise
+  `IllegalSchemeException` when they announce plain http with `allowHttp` at its
+  default `false` (a malformed endpoint URL raises `BadUrlException`).
+  Previously these were used verbatim, so a tampered or misconfigured discovery
+  document could get the client secret posted in plaintext during the code
+  exchange. **Deployments talking to an IdP that announces plain-http endpoints
+  — a local Keycloak without TLS — must now set `allowHttp`**, which is the
+  documented switch for exactly that situation. Scheme comparison is
+  case-insensitive per RFC 3986 §3.1, so `HTTPS://` is accepted where it was
+  previously rejected
 - Strengthened tests guided by mutation testing; mutation score raised to
   93% with a CI threshold of 90 (`minCoveredMsi` in `infection.json5`)
 - Test fixtures and README examples use RFC 2606 reserved domains
