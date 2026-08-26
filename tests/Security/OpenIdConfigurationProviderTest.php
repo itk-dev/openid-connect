@@ -395,6 +395,136 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertInstanceOf(OpenIdConfigurationProvider::class, $provider);
     }
 
+    public function testConstructAcceptsUppercaseHttpsScheme(): void
+    {
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+
+        $provider = new OpenIdConfigurationProvider([
+            'cacheItemPool' => $mockCacheItemPool,
+            'openIDConnectMetadataUrl' => 'HTTPS://provider.example.org/openid-configuration',
+        ], []);
+
+        $this->assertInstanceOf(OpenIdConfigurationProvider::class, $provider);
+    }
+
+    public function testDiscoveredAuthorizationEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => 'http://provider.example.org/oauth2/v2.0/authorize',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "authorization_endpoint" must use https: http://provider.example.org/oauth2/v2.0/authorize');
+
+        $provider->getBaseAuthorizationUrl();
+    }
+
+    public function testDiscoveredTokenEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'token_endpoint' => 'http://provider.example.org/oauth2/v2.0/token',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "token_endpoint" must use https: http://provider.example.org/oauth2/v2.0/token');
+
+        $provider->getBaseAccessTokenUrl([]);
+    }
+
+    /**
+     * The load-bearing case: the code exchange posts the client secret, so a
+     * discovery document announcing a plain-http token endpoint must fail
+     * before the request goes out.
+     */
+    public function testIdTokenExchangeRefusesHttpTokenEndpoint(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'token_endpoint' => 'http://provider.example.org/oauth2/v2.0/token',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "token_endpoint" must use https: http://provider.example.org/oauth2/v2.0/token');
+
+        $provider->getIdToken('test-code');
+    }
+
+    public function testDiscoveredUserinfoEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'userinfo_endpoint' => 'http://provider.example.org/openid/userinfo',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "userinfo_endpoint" must use https: http://provider.example.org/openid/userinfo');
+
+        $provider->getResourceOwnerDetailsUrl($this->createStub(AccessToken::class));
+    }
+
+    public function testDiscoveredEndSessionEndpointMustUseHttps(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'end_session_endpoint' => 'http://provider.example.org/oauth2/v2.0/logout',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "end_session_endpoint" must use https: http://provider.example.org/oauth2/v2.0/logout');
+
+        $provider->getEndSessionUrl();
+    }
+
+    /**
+     * The JWKS URI decides which keys sign-off on identities, so it is held to
+     * the same scheme policy. `getJwtVerificationKeys()` refuses before the
+     * fetch, hence no JWT decode is reached.
+     */
+    public function testJwksFetchRefusesHttpJwksUri(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'jwks_uri' => 'http://provider.example.org/discovery/v2.0/keys',
+        ]);
+
+        $this->expectException(IllegalSchemeException::class);
+        $this->expectExceptionMessage('OIDC discovery document "jwks_uri" must use https: http://provider.example.org/discovery/v2.0/keys');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
+    public function testDiscoveredHttpEndpointsAreAllowedWithAllowHttp(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => 'http://provider.example.org/oauth2/v2.0/authorize',
+            'token_endpoint' => 'http://provider.example.org/oauth2/v2.0/token',
+            'userinfo_endpoint' => 'http://provider.example.org/openid/userinfo',
+            'end_session_endpoint' => 'http://provider.example.org/oauth2/v2.0/logout',
+        ], allowHttp: true);
+
+        $this->assertSame('http://provider.example.org/oauth2/v2.0/authorize', $provider->getBaseAuthorizationUrl());
+        $this->assertSame('http://provider.example.org/oauth2/v2.0/token', $provider->getBaseAccessTokenUrl([]));
+        $this->assertSame('http://provider.example.org/openid/userinfo', $provider->getResourceOwnerDetailsUrl($this->createStub(AccessToken::class)));
+        $this->assertSame('http://provider.example.org/oauth2/v2.0/logout', $provider->getEndSessionUrl());
+    }
+
+    public function testDiscoveredEndpointAcceptsUppercaseHttpsScheme(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => 'HTTPS://provider.example.org/oauth2/v2.0/authorize',
+        ]);
+
+        $this->assertSame('HTTPS://provider.example.org/oauth2/v2.0/authorize', $provider->getBaseAuthorizationUrl());
+    }
+
+    public function testDiscoveredEndpointWithoutSchemeIsRejected(): void
+    {
+        $provider = $this->createProviderWithConfigurationOverrides([
+            'authorization_endpoint' => '/oauth2/v2.0/authorize',
+        ]);
+
+        $this->expectException(BadUrlException::class);
+        $this->expectExceptionMessage('OIDC discovery document "authorization_endpoint" is invalid: /oauth2/v2.0/authorize');
+
+        $provider->getBaseAuthorizationUrl();
+    }
+
     public function testGetEndSessionUrlWithIdToken(): void
     {
         $expected = 'https://azure_b2c_test.b2clogin.com/azure_b2c_test.onmicrosoft.com/oauth2/v2.0/logout?p=test-policy';
@@ -1339,6 +1469,50 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertIsArray($decoded, sprintf('Mock fixture is not valid JSON: %s', $path));
 
         return $decoded;
+    }
+
+    /**
+     * Build a provider whose discovery document is the standard fixture with
+     * the given keys replaced. Used by the endpoint scheme tests to feed
+     * deliberately-insecure endpoint URLs through `getSecureEndpoint`.
+     *
+     * The configuration is served from a cache hit, so no HTTP stub is needed
+     * for the metadata document itself; the JWKS fixture answers the one fetch
+     * that can still happen.
+     *
+     * @param array<string, string> $overrides Discovery document keys to replace
+     */
+    private function createProviderWithConfigurationOverrides(array $overrides, bool $allowHttp = false): OpenIdConfigurationProvider
+    {
+        $configuration = array_merge($this->loadMockFixture('mockOpenIDConfiguration.json'), $overrides);
+
+        $configCacheItem = $this->createStub(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(true);
+        $configCacheItem->method('get')->willReturn($configuration);
+
+        $jwksCacheItem = $this->createStub(CacheItemInterface::class);
+        $jwksCacheItem->method('isHit')->willReturn(false);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturnCallback(
+            fn (string $key) => str_contains($key, 'jwks') ? $jwksCacheItem : $configCacheItem
+        );
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+        $mockHttpClient->method('request')->willReturn(
+            $this->getMockHttpSuccessResponse('/../MockData/mockOpenIDValidationKeys.json')
+        );
+
+        return new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+            'allowHttp' => $allowHttp,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
     }
 
     /**

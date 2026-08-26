@@ -78,6 +78,20 @@ $provider = new OpenIdConfigurationProvider([
 ]);
 ```
 
+##### Scheme enforcement
+
+`allowHttp` governs every URL the client talks to, not just
+`openIDConnectMetadataUrl`. The `authorization_endpoint`, `token_endpoint`,
+`userinfo_endpoint`, `end_session_endpoint` and `jwks_uri` read from the IdP's
+discovery document are held to the same policy: with `allowHttp` at its default
+`false`, a document announcing any of them over plain http raises
+`IllegalSchemeException` before the URL is used. Without that check, a tampered
+or misconfigured document could have the client secret posted in plaintext
+during the code exchange.
+
+Set `allowHttp` when developing against an IdP without TLS — a local Keycloak,
+say. Never in production.
+
 ##### HTTP timeout, proxy, and TLS verification
 
 This library extends `league/oauth2-client`, which uses Guzzle for HTTP. To
