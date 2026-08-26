@@ -122,6 +122,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`provider.example.org` for IdP-side URLs, `app.example.org` for
   application-side URLs) instead of invented registrable domains
 
+### Documentation
+
+- Named the storage contract for `state` and `nonce`: the caller persists both
+  and compares against its own copy. `AbstractProvider` keeps the state on the
+  provider object, so the inherited `getState()` returns it — but on an instance
+  shared between requests (a long-running worker, or a container that memoizes
+  the service) that property holds whichever request wrote it last, which may
+  belong to a different user. `getAuthorizationUrl()` writes it whether or not
+  `generateState()` is used, so the guidance is to never read it back rather
+  than to avoid one method. Documented in `README.md` and on both generator
+  methods
+
 ### Fixed
 
 - A JWKS entry whose RSA `e` or `n` base64-decodes to zero bytes now raises
