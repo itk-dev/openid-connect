@@ -7,167 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
+## [5.1.0] - 2026-08-26
 
-- Dependency on `robrichards/xmlseclibs`. JWKS entries are converted to
-  verification keys by `firebase/php-jwt`'s own `JWK::parseKey()`, which this
-  library already depended on, instead of `XMLSecurityKey::convertRSA()`. Also
-  drops the `phpseclib/phpseclib` subtree that `xmlseclibs` 4.0 brought with it.
-  The strict JWKS validation from 5.0.0 is unchanged and still runs ahead of
-  `parseKey()`, which on its own accepts a non-string, empty or undecodable
-  exponent, coerces a non-string `kid`, and raises a bare `\TypeError` on a
-  non-object entry
+Security hardening, with no API breaks. Three changes affect running
+deployments: an IdP announcing plain-http endpoints now requires `allowHttp`, an
+ID token without `exp` or `iat` is rejected, and the JWKS cache key changed so
+entries written by 5.0 are not reused.
 
 ### Added
 
-- Mutation testing with [Infection](https://infection.github.io/)
-  (`task test:mutation`), run in CI and reported to the Stryker dashboard
-  (mutation score badge in README)
-- PKCE support (RFC 7636), S256 only. `generatePkceVerifier()` returns a
-  128-character verifier and `getPkceChallenge()` derives its challenge;
-  `getIdToken()` takes the verifier as an optional second argument and sends
-  `code_verifier` when given. PKCE is opt-in with no configuration flag —
-  passing a `code_challenge` to `getAuthorizationUrl()` turns it on, and
-  `code_challenge_method=S256` is filled in automatically, since omitting it
-  makes the server assume `plain` (RFC 7636 §4.3) and treat the challenge as a
-  cleartext value. Neither the verifier nor the challenge is stored on the
-  provider: `league/oauth2-client` keeps its verifier on the provider object,
-  which on an instance shared between requests would let one request's verifier
-  be sent for another request's token exchange, so the verifier is carried by
-  the caller in the session exactly like the state and the nonce
-- `phpstan-lowest` CI job and the matching `task analyze:php:lowest`, analysing
-  the declared dependency floor with current dev tooling. Only the packages
-  `require` names are lowered, so findings are about the runtime dependencies
-  rather than a downgraded PHPUnit
+- PKCE (RFC 7636), S256 only. `generatePkceVerifier()` returns a 128-character
+  verifier, `getPkceChallenge()` derives its challenge, and `getIdToken()` takes
+  the verifier as an optional second argument. Opt-in: passing `code_challenge`
+  to `getAuthorizationUrl()` enables it, and `code_challenge_method=S256` is
+  added with it. Neither value is stored on the provider — the caller carries
+  the verifier, as with `state` and `nonce`
 
 ### Changed
 
-- `allowHttp` now governs every URL the client talks to, not just
+- `allowHttp` governs every URL the client uses, not only
   `openIDConnectMetadataUrl`. The `authorization_endpoint`, `token_endpoint`,
-  `userinfo_endpoint`, `end_session_endpoint` and `jwks_uri` read from the IdP's
-  discovery document are validated against the same scheme policy and raise
-  `IllegalSchemeException` when they announce plain http with `allowHttp` at its
-  default `false` (a malformed endpoint URL raises `BadUrlException`).
-  Previously these were used verbatim, so a tampered or misconfigured discovery
-  document could get the client secret posted in plaintext during the code
-  exchange. **Deployments talking to an IdP that announces plain-http endpoints
-  — a local Keycloak without TLS — must now set `allowHttp`**, which is the
-  documented switch for exactly that situation. Scheme comparison is
-  case-insensitive per RFC 3986 §3.1, so `HTTPS://` is accepted where it was
-  previously rejected
-- Strengthened tests guided by mutation testing; mutation score raised to
-  100% with a CI threshold of 100 (`minMsi` / `minCoveredMsi` in
-  `infection.json5`). The four provably equivalent mutants that remain are
-  excluded per mutator with the reason stated, so the threshold is binding: a
-  newly escaped mutant fails the build rather than being absorbed by headroom,
-  and pull requests stay free of `--logger-github` annotations unless they
-  genuinely regress the score
-- The write to `firebase/php-jwt`'s process-global `JWT::$leeway` is contained in
-  a single private `decodeWithLeeway()` method, which does nothing but set the
-  static and decode. Behaviour is unchanged; the point is that the constraint
-  — nothing that could suspend may come between the write and the decode — now
-  has one home and a stated rationale instead of being an ordering that happened
-  to hold. Under PHP-FPM this is a formality, but it is what a fibre-based or
-  worker runtime would depend on
-- The previous `JWT::$leeway` value is restored after each decode. Under PHP-FPM
-  the mutated static died with the request; in a worker process it persisted for
-  the life of the process and silently applied to any other `firebase/php-jwt`
-  consumer that never set its own leeway. Writing a process-global is
-  unavoidable given the upstream API, but leaving it written is not
+  `userinfo_endpoint`, `end_session_endpoint` and `jwks_uri` read from the
+  discovery document raise `IllegalSchemeException` when they announce plain
+  http and `allowHttp` is `false`, and `BadUrlException` when unparsable.
+  Scheme comparison is case-insensitive, so `HTTPS://` is accepted
+- `validateIdToken()` requires `exp` and `iat`, raising `ClaimsException` when
+  either is absent or non-numeric
+- `validateIdToken()` compares the nonce with `hash_equals()`, compares the
+  audience strictly, ignores non-string audience entries, and requires `iss`
+  and `nonce` to be non-empty strings
 - The discovery document and the JWKS are capped at 1 MiB each, raising
-  `HttpException` when a response exceeds it. Both are a few kilobytes in
-  practice, so a hostile or misconfigured endpoint could previously hand over an
-  unbounded body to decode and cache. The declared body size is checked first
-  where the response reports one, and the retrieved content unconditionally,
-  since a chunked response reports no size. The cap bounds what gets decoded and
-  cached rather than peak memory — Guzzle has already buffered the body by the
-  time this library sees it
-- `validateIdToken()` now requires the `exp` and `iat` claims, both REQUIRED by
-  OIDC Core §2, and raises `ClaimsException` when either is absent or
-  non-numeric. `firebase/php-jwt` validates `exp` only when it is present, so a
-  token omitting it never expired. Forged tokens already died at the signature
-  check, so this needs a misbehaving IdP to matter — but **an IdP that issues ID
-  tokens without `exp` or `iat` will now be rejected**
-- `validateIdToken()` compares the nonce with `hash_equals()` rather than `!==`.
-  The nonce is the one claim checked against a value the caller holds, so a
-  timing signal there would leak that secret rather than a public identifier
-- `validateIdToken()` compares the audience strictly. PHP's loose comparison
-  treats numeric strings as equal by value, so an IdP announcing an audience of
-  `"1e2"` previously satisfied a client id of `"100"`. Audience entries that are
-  not strings are ignored, since they cannot match a string client id
-- `validateIdToken()` requires `iss` and `nonce` to be non-empty strings, raising
-  `ClaimsException` otherwise. Both were interpolated into exception messages
-  unchecked, so a signed token carrying an array in either claim turned a claims
-  mismatch into an `\Error` that did not implement
-  `OpenIdConnectExceptionInterface`
-- The JWKS cache now holds the discovery-fetched JWKS document rather than the
-  `Key` objects built from it, under a new cache key (`…||jwks-document`).
-  `JWK::parseKey()` returns keys wrapping an `OpenSSLAsymmetricKey`, which PHP
-  refuses to serialize, so they cannot go into a PSR-6 pool; the document is
-  cached instead and parsed on each call, which costs microseconds and keeps the
-  network fetch cached exactly as before. Entries written by 5.0 under the old
-  `…||jwks` key are left untouched rather than misread, and expire on their own
-- PHPStan analyses the whole PHP range `composer.json` declares (`phpVersion`
-  8.3–8.5 in `phpstan.neon`) rather than whichever version the job happens to
-  run on, and the main job runs on PHP 8.5 so it resolves the newest installable
-  dependency set. Previously analysing on 8.3 said nothing about 8.5
-- Raised the `league/oauth2-client` floor to `^2.8.1` (was `^2.6`). PKCE support
-  arrived in 2.7.0, and 2.8.1 raises league's own Guzzle constraint to
-  `^6.5.8 || ^7.4.5` for the advisories affecting earlier releases
-- Raised `robrichards/xmlseclibs` to `^4.0` (was `^3.1.5`). 4.0 requires
-  `php >= 8.0`, which this library's `php ^8.3` satisfies, and replaces its
-  `ext-openssl` requirement with `phpseclib/phpseclib ^3.0`.
-  `XMLSecurityKey::convertRSA()` — the only API used here — is unchanged
-- Bumped `infection/infection` to `^0.35.2` (was `^0.33.2`), so the 100
-  threshold is verified against the current mutator set rather than one two
-  minors behind. The newer release generates the same mutants and needs no
-  config changes
-- `getIdToken()` no longer lists `IdentityProviderException` among the
-  exceptions it wraps as `CodeException`. The method issues the token request
-  directly rather than through league's `getParsedResponse()`, so
-  `checkResponse()` — the only source of that exception — is never on this path.
-  No change in observable behaviour; the 5.0.0 note naming it was inaccurate
-- Dropped the redundant `'scope' => 'openid'` default from
-  `getAuthorizationUrl()`. league's `getAuthorizationParameters()` already
-  backfills the scope from `getDefaultScopes()`, which returns the same value
-- Test fixtures and README examples use RFC 2606 reserved domains
-  (`provider.example.org` for IdP-side URLs, `app.example.org` for
-  application-side URLs) instead of invented registrable domains
+  `HttpException` above that
+- The JWKS cache holds the fetched JWKS document rather than the parsed `Key`
+  objects, under the cache key `…||jwks-document`
+- `JWT::$leeway` is written in one place and restored after each decode, so the
+  process-global is no longer left applied to other `firebase/php-jwt`
+  consumers in the same process
+- `getIdToken()` no longer catches `IdentityProviderException`; it issues its
+  request directly, so `checkResponse()` is never on that path
+- `league/oauth2-client` requires `^2.8.1` (was `^2.6`)
 
 ### Deprecated
 
-- The `response_type` default of `id_token` in `getAuthorizationUrl()`, together
-  with the `response_mode` default of `query`. That pair is the OIDC implicit
-  flow with the ID token delivered in the query string: OIDC Core §3.2.2.5
-  returns implicit-flow parameters in the fragment, so the `query` mode relies on
-  a provider extension to be readable server-side, and it puts a credential where
-  access logs and browser history can keep it. Pass
-  `'response_type' => 'code'` and exchange the code with `getIdToken()`. **The
-  default becomes `code` in 6.0**, so passing it explicitly now is
-  forward-compatible. No runtime deprecation notice is emitted, since the noise
-  would fall on consumers who cannot silence it except by making this change
+- The `response_type` default of `id_token` and `response_mode` default of
+  `query` in `getAuthorizationUrl()`. Pass `'response_type' => 'code'` and
+  exchange the code with `getIdToken()`. The default becomes `code` in 6.0
 
-### Documentation
+### Removed
 
-- Named the storage contract for `state` and `nonce`: the caller persists both
-  and compares against its own copy. `AbstractProvider` keeps the state on the
-  provider object, so the inherited `getState()` returns it — but on an instance
-  shared between requests (a long-running worker, or a container that memoizes
-  the service) that property holds whichever request wrote it last, which may
-  belong to a different user. `getAuthorizationUrl()` writes it whether or not
-  `generateState()` is used, so the guidance is to never read it back rather
-  than to avoid one method. Documented in `README.md` and on both generator
-  methods
+- Dependency on `robrichards/xmlseclibs`. JWKS entries are converted to
+  verification keys by `firebase/php-jwt`'s `JWK::parseKey()`
 
 ### Fixed
 
-- A JWKS entry whose RSA `e` or `n` base64-decodes to zero bytes now raises
-  `JwksException`. The `is_string()` guard passed such values through, and
-  `xmlseclibs` 4.0 answers them with a bare `\Exception` that would escape
-  `validateIdToken()` without implementing `OpenIdConnectExceptionInterface`.
-  The check sits after the decode because `""`, `" "` and `"\n"` all decode to
-  zero bytes. On `xmlseclibs` 3.1.5 the same input threw nothing and silently
-  built a key from an empty modulus, which then failed signature verification
+- A JWKS RSA entry whose `e` or `n` base64-decodes to zero bytes raises
+  `JwksException` instead of yielding an unusable key
+
+### Tooling
+
+- Mutation testing with [Infection](https://infection.github.io/)
+  (`task test:mutation`), enforced in CI at 100% (`minMsi` and `minCoveredMsi`
+  in `infection.json5`) and reported to the Stryker dashboard
+- PHPStan analyses the declared `php ^8.3` range (8.3–8.5) instead of the
+  runtime version, and runs on PHP 8.5
+- `phpstan-lowest` CI job and `task analyze:php:lowest`, analysing the declared
+  dependency floor
+
+### Documentation
+
+- `state` and `nonce` are caller-carried. The inherited `getState()` must not be
+  read back: on a provider instance shared between requests it holds whichever
+  request wrote it last
+- README sections covering scheme enforcement, PKCE, and the `response_type`
+  default
 
 ## [5.0.0] - 2026-06-02
 
@@ -389,7 +301,8 @@ for the consumer migration guide.
 - This CHANGELOG file to hopefully serve as an evolving example of a
   standardized open source project CHANGELOG.
 
-[Unreleased]: https://github.com/itk-dev/openid-connect/compare/5.0.0...HEAD
+[Unreleased]: https://github.com/itk-dev/openid-connect/compare/5.1.0...HEAD
+[5.1.0]: https://github.com/itk-dev/openid-connect/compare/5.0.0...5.1.0
 [5.0.0]: https://github.com/itk-dev/openid-connect/compare/4.1.2...5.0.0
 [4.1.2]: https://github.com/itk-dev/openid-connect/compare/4.1.1...4.1.2
 [4.1.1]: https://github.com/itk-dev/openid-connect/compare/4.1.0...4.1.1
