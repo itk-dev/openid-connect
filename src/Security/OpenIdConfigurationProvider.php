@@ -234,10 +234,9 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * constant-time: it is the only claim compared against a value the caller
      * holds, so a timing signal would leak that secret.
      *
-     * Note: JWT::$leeway is a static property, so in environments with multiple
-     * OpenIdConfigurationProvider instances (e.g. multi-tenant setups in long-running
-     * processes), the leeway value set by the last provider to call validateIdToken()
-     * will apply globally until overwritten.
+     * Note: the leeway is applied through a process-global static in
+     * firebase/php-jwt, so with several providers configured differently the
+     * value belongs to whichever called last. See decodeWithLeeway().
      *
      * @param string $idToken Raw id token
      * @param string $nonce   Nonce
@@ -257,10 +256,7 @@ class OpenIdConfigurationProvider extends AbstractProvider
     {
         try {
             $keys = $this->getJwtVerificationKeys();
-            // NB: JWT::$leeway is a static property shared across all instances.
-            // Always set it immediately before decode to ensure the correct value.
-            JWT::$leeway = $this->leeway;
-            $claims = JWT::decode($idToken, $keys);
+            $claims = $this->decodeWithLeeway($idToken, $keys);
 
             // "exp" and "iat" are REQUIRED by OIDC Core §2, but
             // firebase/php-jwt only validates them when they are present — a
@@ -296,6 +292,35 @@ class OpenIdConfigurationProvider extends AbstractProvider
         } catch (\UnexpectedValueException $e) {
             throw new ValidationException('ID token validation failed: '.$e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * Decode an ID token, applying the configured leeway.
+     *
+     * INVARIANT: firebase/php-jwt exposes leeway only as `JWT::$leeway`, a
+     * process-global static with no per-call alternative, so this method is the
+     * single place that writes it. Nothing may come between the write and
+     * `JWT::decode()` that could suspend — no HTTP, no cache read, no I/O of any
+     * kind. That is why the verification keys are resolved by the caller before
+     * this is entered, and why this method does nothing else.
+     *
+     * Under PHP-FPM, where a request owns its process, that ordering is a
+     * formality. Under cooperative concurrency it is what stops a fiber from
+     * decoding with a sibling provider's leeway, and under a preemptive model it
+     * would not be sufficient at all. Revisit before adopting FrankenPHP
+     * workers or any other long-lived concurrent runtime.
+     *
+     * @param array<string, Key> $keys Verification keys, indexed by JWK `kid`
+     *
+     * @return \stdClass The token's payload, as JWT::decode() returns it
+     *
+     * @throws \UnexpectedValueException from JWT::decode(), wrapped by the caller
+     */
+    private function decodeWithLeeway(string $idToken, array $keys): \stdClass
+    {
+        JWT::$leeway = $this->leeway;
+
+        return JWT::decode($idToken, $keys);
     }
 
     /**

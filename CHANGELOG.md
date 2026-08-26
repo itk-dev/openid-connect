@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newly escaped mutant fails the build rather than being absorbed by headroom,
   and pull requests stay free of `--logger-github` annotations unless they
   genuinely regress the score
+- The write to `firebase/php-jwt`'s process-global `JWT::$leeway` is contained in
+  a single private `decodeWithLeeway()` method, which does nothing but set the
+  static and decode. Behaviour is unchanged; the point is that the constraint
+  — nothing that could suspend may come between the write and the decode — now
+  has one home and a stated rationale instead of being an ordering that happened
+  to hold. Under PHP-FPM this is a formality, but it is what a fibre-based or
+  worker runtime would depend on
 - The discovery document and the JWKS are capped at 1 MiB each, raising
   `HttpException` when a response exceeds it. Both are a few kilobytes in
   practice, so a hostile or misconfigured endpoint could previously hand over an

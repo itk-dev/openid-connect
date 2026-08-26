@@ -306,6 +306,25 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertEquals(self::CLIENT_ID, $claims->aud);
     }
 
+    /**
+     * The configured leeway must reach firebase/php-jwt. It travels through the
+     * process-global JWT::$leeway, which is why MockJWT declares that static —
+     * asserting it here is what pins decodeWithLeeway() to writing the
+     * provider's value rather than leaving whatever was there before.
+     */
+    public function testValidateIdTokenAppliesConfiguredLeeway(): void
+    {
+        MockJWT::$leeway = null;
+
+        $mockJWT = $this->overloadJwt();
+        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
+
+        $this->provider->validateIdToken('token', self::NONCE);
+
+        // 30 is the leeway the provider is constructed with in setUp().
+        $this->assertSame(30, MockJWT::$leeway);
+    }
+
     public function testValidateIdTokenFailure(): void
     {
         $mockJWT = $this->overloadJwt();
