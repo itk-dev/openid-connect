@@ -29,7 +29,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case-insensitive per RFC 3986 §3.1, so `HTTPS://` is accepted where it was
   previously rejected
 - Strengthened tests guided by mutation testing; mutation score raised to
-  93% with a CI threshold of 90 (`minCoveredMsi` in `infection.json5`)
+  100% with a CI threshold of 100 (`minMsi` / `minCoveredMsi` in
+  `infection.json5`). The four provably equivalent mutants that remain are
+  excluded per mutator with the reason stated, so the threshold is binding: a
+  newly escaped mutant fails the build rather than being absorbed by headroom,
+  and pull requests stay free of `--logger-github` annotations unless they
+  genuinely regress the score
+- Bumped `infection/infection` to `^0.35.2` (was `^0.33.2`), so the 100
+  threshold is verified against the current mutator set rather than one two
+  minors behind. The newer release generates the same mutants and needs no
+  config changes
+- `getIdToken()` no longer lists `IdentityProviderException` among the
+  exceptions it wraps as `CodeException`. The method issues the token request
+  directly rather than through league's `getParsedResponse()`, so
+  `checkResponse()` — the only source of that exception — is never on this path.
+  No change in observable behaviour; the 5.0.0 note naming it was inaccurate
+- Dropped the redundant `'scope' => 'openid'` default from
+  `getAuthorizationUrl()`. league's `getAuthorizationParameters()` already
+  backfills the scope from `getDefaultScopes()`, which returns the same value
 - Test fixtures and README examples use RFC 2606 reserved domains
   (`provider.example.org` for IdP-side URLs, `app.example.org` for
   application-side URLs) instead of invented registrable domains
