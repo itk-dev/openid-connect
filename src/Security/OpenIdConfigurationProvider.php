@@ -157,9 +157,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
             throw new MissingParameterException('Required parameter "nonce" missing');
         }
 
-        // Add default options scope, response_type and response_mode
+        // Add default response_type and response_mode. The `scope` default is
+        // supplied by getDefaultScopes() via league's
+        // getAuthorizationParameters(), so it is not repeated here.
         return parent::getAuthorizationUrl($options + [
-            'scope' => 'openid',
             'response_type' => 'id_token',
             'response_mode' => 'query',
         ]);
@@ -292,11 +293,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
             }
 
             return $payload['id_token'];
-        } catch (IdentityProviderException|ClientExceptionInterface|\JsonException $e) {
-            // Narrow boundary: IdentityProviderException from league's checkResponse,
-            // ClientExceptionInterface from Guzzle, \JsonException from json_decode.
-            // Other failures (e.g. CacheException from getConfiguration) propagate
-            // as their own concrete OpenIdConnectExceptionInterface subtypes.
+        } catch (ClientExceptionInterface|\JsonException $e) {
+            // Narrow boundary: ClientExceptionInterface from Guzzle,
+            // \JsonException from json_decode. This method issues the token
+            // request directly rather than through league's getParsedResponse(),
+            // so checkResponse() — and with it IdentityProviderException — is
+            // never on this path. Other failures (e.g. CacheException from
+            // getSecureEndpoint) propagate as their own concrete
+            // OpenIdConnectExceptionInterface subtypes.
             throw new CodeException('Get ID token failed: '.$e->getMessage(), 0, $e);
         }
     }

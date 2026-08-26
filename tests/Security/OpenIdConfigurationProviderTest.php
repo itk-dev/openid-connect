@@ -172,6 +172,26 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertSame(32, strlen($nonce));
     }
 
+    /**
+     * The default length is the entropy of the state parameter, so it is
+     * asserted without passing an explicit argument.
+     */
+    public function testGenerateStateDefaultsTo32Characters(): void
+    {
+        $state = $this->provider->generateState();
+
+        $this->assertSame(32, strlen($state));
+        $this->assertSame($state, $this->provider->getState());
+    }
+
+    /**
+     * As above, for the nonce.
+     */
+    public function testGenerateNonceDefaultsTo32Characters(): void
+    {
+        $this->assertSame(32, strlen($this->provider->generateNonce()));
+    }
+
     public function testGetBaseAuthorizationUrl(): void
     {
         $authUrl = $this->provider->getBaseAuthorizationUrl();
@@ -869,6 +889,40 @@ class OpenIdConfigurationProviderTest extends TestCase
         $this->assertSame($configuration['authorization_endpoint'], $authUrl);
     }
 
+    /**
+     * A PSR-6 pool round-trips serialized values, so an entry written by
+     * another code path (or an older version of this library) can come back as
+     * an object rather than an array. The `(array)` cast in `getConfiguration()`
+     * absorbs that; without it PHP raises "Cannot use object of type stdClass
+     * as array" — a bare `\Error`, which is not part of the library's exception
+     * contract.
+     */
+    public function testGetConfigurationCacheHitWithObjectPayload(): void
+    {
+        $configuration = $this->loadMockFixture('mockOpenIDConfiguration.json');
+
+        $mockCacheItem = $this->createStub(CacheItemInterface::class);
+        $mockCacheItem->method('isHit')->willReturn(true);
+        $mockCacheItem->method('get')->willReturn((object) $configuration);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturn($mockCacheItem);
+
+        $mockHttpClient = $this->createStub(ClientInterface::class);
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => 'https://provider.example.org/openid-configuration',
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $mockHttpClient,
+        ]);
+
+        $this->assertSame($configuration['authorization_endpoint'], $provider->getBaseAuthorizationUrl());
+    }
+
     public function testGetConfigurationMissingKey(): void
     {
         $this->expectException(\ItkDev\OpenIdConnect\Exception\MetadataException::class);
@@ -1200,6 +1254,48 @@ class OpenIdConfigurationProviderTest extends TestCase
         $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
         $mockClaims = $this->getMockClaims();
         $mockJWT->shouldReceive('decode')->andReturn($mockClaims);
+
+        /** @var object{nonce: string} $claims */
+        $claims = $provider->validateIdToken('token', self::NONCE);
+        $this->assertEquals(self::NONCE, $claims->nonce);
+    }
+
+    /**
+     * As for the discovery document, a cached JWKS map can come back as an
+     * object. The `(array)` cast in `getJwtVerificationKeys()` absorbs it;
+     * without the cast the method returns an object from an `: array` return
+     * type and PHP raises a `TypeError`.
+     */
+    public function testGetJwtVerificationKeysCacheHitWithObjectPayload(): void
+    {
+        $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
+
+        $configCacheItem = $this->createStub(CacheItemInterface::class);
+        $configCacheItem->method('isHit')->willReturn(true);
+        $configCacheItem->method('get')->willReturn($this->loadMockFixture('mockOpenIDConfiguration.json'));
+
+        $jwksCacheItem = $this->createStub(CacheItemInterface::class);
+        $jwksCacheItem->method('isHit')->willReturn(true);
+        $jwksCacheItem->method('get')->willReturn((object) ['key1' => new Key('public-key-data', 'RS256')]);
+
+        $mockCacheItemPool = $this->createStub(CacheItemPoolInterface::class);
+        $mockCacheItemPool->method('getItem')->willReturnCallback(
+            fn (string $key) => str_contains($key, 'jwks') ? $jwksCacheItem : $configCacheItem
+        );
+
+        $provider = new OpenIdConfigurationProvider([
+            'openIDConnectMetadataUrl' => $openIDConnectMetadataUrl,
+            'cacheItemPool' => $mockCacheItemPool,
+            'clientId' => self::CLIENT_ID,
+            'clientSecret' => self::CLIENT_SECRET,
+            'redirectUri' => self::REDIRECT_URI,
+        ], [
+            'httpClient' => $this->createStub(ClientInterface::class),
+        ]);
+
+        /** @var \Mockery\MockInterface $mockJWT */
+        $mockJWT = \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+        $mockJWT->shouldReceive('decode')->andReturn($this->getMockClaims());
 
         /** @var object{nonce: string} $claims */
         $claims = $provider->validateIdToken('token', self::NONCE);
