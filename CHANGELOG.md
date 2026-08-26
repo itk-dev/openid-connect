@@ -66,6 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`provider.example.org` for IdP-side URLs, `app.example.org` for
   application-side URLs) instead of invented registrable domains
 
+### Fixed
+
+- A JWKS entry whose RSA `e` or `n` base64-decodes to zero bytes now raises
+  `JwksException`. The `is_string()` guard passed such values through, and
+  `xmlseclibs` 4.0 answers them with a bare `\Exception` that would escape
+  `validateIdToken()` without implementing `OpenIdConnectExceptionInterface`.
+  The check sits after the decode because `""`, `" "` and `"\n"` all decode to
+  zero bytes. On `xmlseclibs` 3.1.5 the same input threw nothing and silently
+  built a key from an empty modulus, which then failed signature verification
+
 ## [5.0.0] - 2026-06-02
 
 Reworked exception hierarchy and tightened IdP-payload validations. The runtime

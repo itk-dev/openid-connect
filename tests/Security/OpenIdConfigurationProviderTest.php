@@ -1120,6 +1120,40 @@ class OpenIdConfigurationProviderTest extends TestCase
         $provider->validateIdToken('token', self::NONCE);
     }
 
+    /**
+     * An exponent of whitespace is a string, and base64-decodes to zero bytes,
+     * so it clears the is_string guard and reaches the key conversion. The
+     * emptiness check has to sit after the decode for exactly this reason.
+     */
+    public function testGetJwtVerificationKeysRejectsRsaWithEmptyExponent(): void
+    {
+        $provider = $this->createProviderWithCustomJwks(
+            (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => ' ', 'n' => 'abc']]]),
+        );
+        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+
+        $this->expectException(JwksException::class);
+        $this->expectExceptionMessage('JWK RSA entry has empty "e"/"n" for key id: key-1');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
+    /**
+     * As above, for the modulus.
+     */
+    public function testGetJwtVerificationKeysRejectsRsaWithEmptyModulus(): void
+    {
+        $provider = $this->createProviderWithCustomJwks(
+            (string) json_encode(['keys' => [['kid' => 'key-1', 'kty' => 'RSA', 'e' => 'AQAB', 'n' => '']]]),
+        );
+        \Mockery::mock('overload:Firebase\JWT\JWT', MockJWT::class);
+
+        $this->expectException(JwksException::class);
+        $this->expectExceptionMessage('JWK RSA entry has empty "e"/"n" for key id: key-1');
+
+        $provider->validateIdToken('token', self::NONCE);
+    }
+
     public function testGetJwtVerificationKeysRejectsNonStringKid(): void
     {
         $openIDConnectMetadataUrl = 'https://provider.example.org/openid-configuration';
