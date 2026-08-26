@@ -415,6 +415,14 @@ class OpenIdConfigurationProvider extends AbstractProvider
      * Generates a new random string to use as the state parameter in an
      * authorization flow.
      *
+     * The value is also stored on the provider, so the inherited `getState()`
+     * returns it. Do not read it back from there. `getAuthorizationUrl()` writes
+     * the same property whether or not this method is used, so on a provider
+     * instance shared between requests — a long-running worker, or a container
+     * that memoizes the service — it holds whichever request wrote it last,
+     * which may belong to another user. The caller must persist the state
+     * itself, in the session, and compare against that.
+     *
      * @param int $length Length of the random string to be generated
      *
      * @return string The generated state
@@ -429,6 +437,10 @@ class OpenIdConfigurationProvider extends AbstractProvider
     /**
      * Generates a new random string to use as the nonce parameter in an
      * authorization flow.
+     *
+     * Nothing is stored on the provider: the caller is the only holder of this
+     * value, which is the contract the state parameter should be treated as
+     * having too.
      *
      * @param int $length Length of the random string to be generated
      *

@@ -173,6 +173,20 @@ $authUrl = $provider->getAuthorizationUrl(['state' => $state, 'nonce' => $nonce]
 // redirect to $authUrl
 ```
 
+##### The session is the only store for "state" and "nonce"
+
+The snippet above is the contract, not just one way of writing it: the caller
+persists both values and compares against its own copy on the way back.
+
+`AbstractProvider` also keeps the state on the provider object, so the inherited
+`getState()` returns it — `getAuthorizationUrl()` writes that property whether or
+not `generateState()` is used. **Do not read the state back from the provider.**
+Where the provider is constructed per request that is merely redundant, but on a
+shared instance — a long-running worker such as FrankenPHP or Swoole, or a
+container that memoizes the service — the property holds whichever request wrote
+it last, which may belong to a different user. `generateNonce()` stores nothing,
+and the state is best treated as though it did the same.
+
 Note that the default response type and mode
 is set in ```OpenIdConfigurationProvider.php```
 
