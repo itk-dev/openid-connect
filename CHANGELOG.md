@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mutation testing with [Infection](https://infection.github.io/)
   (`task test:mutation`), run in CI and reported to the Stryker dashboard
   (mutation score badge in README)
+- `phpstan-lowest` CI job and the matching `task analyze:php:lowest`, analysing
+  the declared dependency floor with current dev tooling. Only the packages
+  `require` names are lowered, so findings are about the runtime dependencies
+  rather than a downgraded PHPUnit
 
 ### Changed
 
@@ -35,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newly escaped mutant fails the build rather than being absorbed by headroom,
   and pull requests stay free of `--logger-github` annotations unless they
   genuinely regress the score
+- PHPStan analyses the whole PHP range `composer.json` declares (`phpVersion`
+  8.3–8.5 in `phpstan.neon`) rather than whichever version the job happens to
+  run on, and the main job runs on PHP 8.5 so it resolves the newest installable
+  dependency set. Previously analysing on 8.3 said nothing about 8.5
+- Raised the `league/oauth2-client` floor to `^2.8.1` (was `^2.6`). PKCE support
+  arrived in 2.7.0, and 2.8.1 raises league's own Guzzle constraint to
+  `^6.5.8 || ^7.4.5` for the advisories affecting earlier releases
+- Raised `robrichards/xmlseclibs` to `^4.0` (was `^3.1.5`). 4.0 requires
+  `php >= 8.0`, which this library's `php ^8.3` satisfies, and replaces its
+  `ext-openssl` requirement with `phpseclib/phpseclib ^3.0`.
+  `XMLSecurityKey::convertRSA()` — the only API used here — is unchanged
 - Bumped `infection/infection` to `^0.35.2` (was `^0.33.2`), so the 100
   threshold is verified against the current mutator set rather than one two
   minors behind. The newer release generates the same mutants and needs no
@@ -50,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test fixtures and README examples use RFC 2606 reserved domains
   (`provider.example.org` for IdP-side URLs, `app.example.org` for
   application-side URLs) instead of invented registrable domains
+
+### Fixed
+
+- A JWKS entry whose RSA `e` or `n` base64-decodes to zero bytes now raises
+  `JwksException`. The `is_string()` guard passed such values through, and
+  `xmlseclibs` 4.0 answers them with a bare `\Exception` that would escape
+  `validateIdToken()` without implementing `OpenIdConnectExceptionInterface`.
+  The check sits after the decode because `""`, `" "` and `"\n"` all decode to
+  zero bytes. On `xmlseclibs` 3.1.5 the same input threw nothing and silently
+  built a key from an empty modulus, which then failed signature verification
 
 ## [5.0.0] - 2026-06-02
 

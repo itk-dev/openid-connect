@@ -432,6 +432,15 @@ class OpenIdConfigurationProvider extends AbstractProvider
                         }
                         $e = self::base64urlDecode($key['e']);
                         $n = self::base64urlDecode($key['n']);
+                        // Checked after decoding, not before: "" but also " "
+                        // and "\n" all base64-decode to zero bytes. xmlseclibs
+                        // 4.0 answers an empty modulus or exponent with a bare
+                        // \Exception, which would escape this method without
+                        // implementing OpenIdConnectExceptionInterface; 3.1.5
+                        // was worse and silently built a key from nothing.
+                        if ('' === $e || '' === $n) {
+                            throw new JwksException('JWK RSA entry has empty "e"/"n" for key id: '.$kid);
+                        }
                         $publicKey = XMLSecurityKey::convertRSA($n, $e);
                         $keys[$kid] = new Key($publicKey, 'RS256');
                     } else {
